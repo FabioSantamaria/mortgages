@@ -89,7 +89,7 @@ def plot_hipoteca_simple(df_hipoteca_simple):
         x=df_hipoteca_simple['Mes'],
         y=df_hipoteca_simple['Intereses_mensuales'],
         mode='lines',
-        line=dict(color='black'),
+        line=dict(color='yellow'),
         name='Intereses Mensuales'
     ))
     
@@ -104,7 +104,7 @@ def plot_hipoteca_simple(df_hipoteca_simple):
             y=0.99,
             xanchor="left",
             x=0.01,
-            bgcolor="white",
+            bgcolor="black",
             bordercolor="black",
             borderwidth=1
         )

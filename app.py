@@ -213,7 +213,7 @@ def plot_hipoteca_simple(df_hipoteca_simple):
         x=df_hipoteca_simple['Mes'],
         y=df_hipoteca_simple['Intereses_mensuales'],
         mode='lines',
-        line=dict(color='black'),
+        line=dict(color='yellow'),
         name='Intereses Mensuales'
     ))
     
@@ -224,13 +224,13 @@ def plot_hipoteca_simple(df_hipoteca_simple):
         font_family="Arial",
         font_color="black",
         legend=dict(
-            yanchor="top",
-            y=0.99,
-            xanchor="right",
-            x=0.01,
-            bgcolor="black",
-            bordercolor="black",
-            borderwidth=1
+            #yanchor="top",
+            #y=0.99,
+            #xanchor="right",
+            #x=0.01,
+            #bgcolor="black",
+            #bordercolor="black",
+            #borderwidth=1
         )
     )
     
@@ -243,10 +243,10 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
     # Original (sin inyecciones)
     fig.add_trace(go.Scatter(
         x=df_hipoteca_original['Mes'],
-        y=df_hipoteca_original['Capital_pendiente'],
+        y=df_hipoteca_original['Amortizacion_mensual'],
         mode='lines',
         line=dict(color='blue', dash='dash'),
-        name='Capital Pendiente (Original)'
+        name='Amortización Mensual (Original)'
     ))
 
     fig.add_trace(go.Scatter(
@@ -257,13 +257,21 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         name='Cuota Mensual (Original)'
     ))
 
+    fig.add_trace(go.Scatter(
+        x=df_hipoteca_original['Mes'],
+        y=df_hipoteca_original['Intereses_mensuales'],
+        mode='lines',
+        line=dict(color='yellow', dash='dash'),
+        name='Intereses Mensuales (Original)'
+    ))
+
     # Con inyecciones
     fig.add_trace(go.Scatter(
         x=df_hipoteca_con_inyecciones['Mes'],
-        y=df_hipoteca_con_inyecciones['Capital_pendiente'],
+        y=df_hipoteca_con_inyecciones['Amortizacion_mensual'],
         mode='lines',
         line=dict(color='blue'),
-        name='Capital Pendiente (Con Inyecciones)'
+        name='Amortización Mensual (Con Inyecciones)'
     ))
 
     fig.add_trace(go.Scatter(
@@ -274,16 +282,25 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         name='Cuota Mensual (Con Inyecciones)'
     ))
 
+    fig.add_trace(go.Scatter(
+        x=df_hipoteca_con_inyecciones['Mes'],
+        y=df_hipoteca_con_inyecciones['Intereses_mensuales'],
+        mode='lines',
+        line=dict(color='yellow'),
+        name='Intereses Mensuales (Con Inyecciones)'
+    ))
+
     # Marcar inyecciones
     inyecciones_meses = df_hipoteca_con_inyecciones[df_hipoteca_con_inyecciones['Inyeccion_capital'] > 0]
     if not inyecciones_meses.empty:
-        fig.add_trace(go.Scatter(
-            x=inyecciones_meses['Mes'],
-            y=inyecciones_meses['Capital_pendiente'],
-            mode='markers',
-            marker=dict(color='green'),
-            name='Inyecciones de Capital'
-        ))
+        for mes in inyecciones_meses['Mes']:
+            fig.add_vline(
+                x=mes,
+                line_dash="solid",
+                line_color="green",
+                line_width=2,
+                name="Inyecciones de Capital"
+            )
 
     fig.update_layout(
         title='Comparativa: Hipoteca Original vs. Hipoteca con Amortizaciones Anticipadas',
@@ -292,13 +309,13 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         font_family="Arial",
         font_color="black",
         legend=dict(
-            yanchor="top",
-            y=0.99,
-            xanchor="right",
-            x=0.01,
-            bgcolor="black",
-            bordercolor="black",
-            borderwidth=1
+            # yanchor="top",
+            # y=0.99,
+            # xanchor="right",
+            # x=0.01,
+            # bgcolor="black",
+            # bordercolor="black",
+            # borderwidth=1
         )
     )
     
@@ -464,22 +481,28 @@ elif opcion == "Amortizaciones anticipadas":
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            mes_inyeccion = st.number_input("Mes de la inyección", min_value=1, max_value=plazo_anos*12, value=12, step=1)
+            mes_inyeccion = st.number_input("Mes de la inyección", min_value=1, max_value=plazo_anos*12, value=48, step=1)
         with col2:
-            capital_inyectado = st.number_input("Capital a inyectar (€)", min_value=100, value=10000, step=100)
+            capital_inyectado = st.number_input("Capital a inyectar (€)", min_value=100, value=20000, step=100)
         with col3:
             tipo_inyeccion = st.selectbox("Tipo de reducción", ["cuota", "plazo"])
         with col4:
             st.write("")
             st.write("")
             if st.button("Agregar inyección"):
-                nueva_inyeccion = {
-                    'mes_inyeccion': mes_inyeccion,
-                    'capital_inyectado': capital_inyectado,
-                    'tipo_inyeccion': tipo_inyeccion
-                }
-                st.session_state.inyecciones.append(nueva_inyeccion)
-                st.success("Inyección agregada!")
+                # Check if there's already an injection for this month
+                mes_exists = any(inj['mes_inyeccion'] == mes_inyeccion for inj in st.session_state.inyecciones)
+                
+                if mes_exists:
+                    st.error(f"Ya existe una inyección para el mes {mes_inyeccion}")
+                else:
+                    nueva_inyeccion = {
+                        'mes_inyeccion': mes_inyeccion,
+                        'capital_inyectado': capital_inyectado,
+                        'tipo_inyeccion': tipo_inyeccion
+                    }
+                    st.session_state.inyecciones.append(nueva_inyeccion)
+                    st.success("Inyección agregada!")
     
     # Mostrar inyecciones actuales
     if st.session_state.inyecciones:

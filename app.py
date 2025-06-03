@@ -20,6 +20,18 @@ def intereses_mensuales(capital_pendiente, tasa):
     tasa_mensual = tasa / 1200
     return capital_pendiente * tasa_mensual
 
+def calcular_plazo(capital, tasa, cuota):
+    """Calculate remaining months to pay the loan"""
+    if capital <= 0:
+        return 0
+    
+    tasa_mensual = tasa / 1200
+    if cuota <= capital * tasa_mensual:
+        raise ValueError("La cuota no cubre los intereses mínimos")
+    
+    plazo = -math.log(1 - capital * tasa_mensual / cuota) / math.log(1 + tasa_mensual)
+    return max(math.ceil(plazo), 1)
+
 def maximo_precio_piso_segun_sueldo(sueldo_neto_mensual, relacion_cuota_sueldo, 
                                     porcentaje_entrada, tasa_interes, plazo):
     """Calculate maximum house price based on salary"""
@@ -65,6 +77,118 @@ def simulacion_hipoteca_simple(capital_inicial, tasa, plazo_inicial, cuota_inici
     
     return pd.DataFrame(registros)
 
+def simulacion_hipoteca_multiple_inyeccion(capital_inicial, tasa, plazo_inicial,
+                                            cuota_inicial, inyecciones):
+    """
+    Simulación robusta de hipoteca con múltiples inyecciones de capital y tipos de reducción
+    definidos para cada inyección a lo largo del tiempo.
+    """
+    # Validaciones iniciales generales
+    if capital_inicial <= 0:
+        raise ValueError("El capital inicial debe ser positivo")
+    if plazo_inicial <= 0:
+        raise ValueError("El plazo inicial debe ser positivo")
+    if cuota_inicial <= 0:
+        raise ValueError("La cuota inicial debe ser positiva")
+
+    # Validaciones de las inyecciones
+    if not isinstance(inyecciones, list):
+        raise TypeError("Las inyecciones deben ser una lista de diccionarios")
+    
+    opcion_reduccion_actual = None
+    for inyeccion in inyecciones:
+        if not isinstance(inyeccion, dict):
+            raise TypeError("Cada inyección debe ser un diccionario")
+        if 'mes_inyeccion' not in inyeccion:
+            raise ValueError("Cada inyección debe tener 'mes_inyeccion'")
+        if 'capital_inyectado' not in inyeccion:
+            inyeccion['capital_inyectado'] = 0
+        if 'tipo_inyeccion' in inyeccion and inyeccion['tipo_inyeccion'] not in ['cuota', 'plazo']:
+            raise ValueError("Tipo de inyección debe ser 'cuota' o 'plazo' o None")
+
+    registros = []
+    capital_pendiente = capital_inicial
+    cuota_actual = cuota_inicial
+    plazo_restante = plazo_inicial
+    mes_actual = 0
+
+    for mes in range(1, plazo_inicial + 1):
+        mes_actual += 1
+
+        # Verificar si hay inyección/acción este mes
+        inyeccion_mes = 0
+        tipo_inyeccion_mes = None
+        for inyeccion in inyecciones:
+            if inyeccion['mes_inyeccion'] == mes_actual:
+                inyeccion_mes = inyeccion['capital_inyectado']
+                tipo_inyeccion_mes = inyeccion['tipo_inyeccion']
+
+        # Aplicar inyección si existe y validar que no supere el capital restante
+        if inyeccion_mes > 0:
+            if inyeccion_mes > capital_pendiente:
+                raise ValueError(f"Inyección en el mes {mes_actual} supera el capital pendiente.")
+            capital_pendiente -= inyeccion_mes
+
+        if capital_pendiente <= 0:
+            registros.append({
+                'Mes': mes_actual,
+                'Capital_pendiente': 0,
+                'Cuota_mensual': 0,
+                'Intereses_mensuales': 0,
+                'Amortizacion_mensual': 0,
+                'Inyeccion_capital': inyeccion_mes,
+                'Tipo_Reduccion': tipo_inyeccion_mes if tipo_inyeccion_mes else opcion_reduccion_actual
+            })
+            break
+
+        interes = intereses_mensuales(capital_pendiente, tasa)
+        amortizacion = min(cuota_actual - interes, capital_pendiente)
+
+        registros.append({
+            'Mes': mes_actual,
+            'Capital_pendiente': capital_pendiente,
+            'Cuota_mensual': cuota_actual,
+            'Intereses_mensuales': interes,
+            'Amortizacion_mensual': amortizacion,
+            'Inyeccion_capital': inyeccion_mes,
+            'Tipo_Reduccion': tipo_inyeccion_mes if tipo_inyeccion_mes else opcion_reduccion_actual
+        })
+
+        capital_pendiente -= amortizacion
+
+        # Recalcular cuota o plazo si hubo inyección o cambio de tipo y aún queda préstamo
+        if (inyeccion_mes > 0 or tipo_inyeccion_mes) and capital_pendiente > 0:
+            if tipo_inyeccion_mes:
+                opcion_reduccion_actual = tipo_inyeccion_mes
+
+            nuevo_capital = capital_pendiente
+
+            if opcion_reduccion_actual == 'cuota':
+                plazo_restante_recalculo = max(plazo_inicial - mes_actual, 1)
+                cuota_actual = cuota_mensual(nuevo_capital, tasa, plazo_restante_recalculo)
+            elif opcion_reduccion_actual == 'plazo':
+                cuota_actual_recalculo = cuota_actual
+                plazo_restante = calcular_plazo(nuevo_capital, tasa, cuota_actual_recalculo)
+                plazo_inicial = mes_actual + plazo_restante
+
+    return pd.DataFrame(registros)
+
+def calcular_ahorro_intereses_multiple_inyeccion(capital_inicial, tasa, plazo_inicial,
+                                                 cuota_inicial, inyecciones):
+    """Calculate total interest savings from multiple injections"""
+    # Simulación con inyecciones
+    df_con_inyecciones = simulacion_hipoteca_multiple_inyeccion(
+        capital_inicial, tasa, plazo_inicial, cuota_inicial, inyecciones)
+    intereses_con_inyecciones = df_con_inyecciones['Intereses_mensuales'].sum()
+
+    # Simulación base SIN inyecciones
+    df_sin_inyecciones = simulacion_hipoteca_multiple_inyeccion(
+        capital_inicial, tasa, plazo_inicial, cuota_inicial, inyecciones=[])
+    intereses_sin_inyecciones = df_sin_inyecciones['Intereses_mensuales'].sum()
+
+    ahorro_intereses = intereses_sin_inyecciones - intereses_con_inyecciones
+    return ahorro_intereses, intereses_sin_inyecciones, intereses_con_inyecciones
+
 def plot_hipoteca_simple(df_hipoteca_simple):
     """Create interactive plot for mortgage simulation"""
     fig = go.Figure()
@@ -89,7 +213,7 @@ def plot_hipoteca_simple(df_hipoteca_simple):
         x=df_hipoteca_simple['Mes'],
         y=df_hipoteca_simple['Intereses_mensuales'],
         mode='lines',
-        line=dict(color='yellow'),
+        line=dict(color='black'),
         name='Intereses Mensuales'
     ))
     
@@ -102,7 +226,75 @@ def plot_hipoteca_simple(df_hipoteca_simple):
         legend=dict(
             yanchor="top",
             y=0.99,
-            xanchor="left",
+            xanchor="right",
+            x=0.01,
+            bgcolor="black",
+            bordercolor="black",
+            borderwidth=1
+        )
+    )
+    
+    return fig
+
+def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
+    """Create comparison plot between original and early payment scenarios"""
+    fig = go.Figure()
+
+    # Original (sin inyecciones)
+    fig.add_trace(go.Scatter(
+        x=df_hipoteca_original['Mes'],
+        y=df_hipoteca_original['Capital_pendiente'],
+        mode='lines',
+        line=dict(color='blue', dash='dash'),
+        name='Capital Pendiente (Original)'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df_hipoteca_original['Mes'],
+        y=df_hipoteca_original['Cuota_mensual'],
+        mode='lines',
+        line=dict(color='red', dash='dash'),
+        name='Cuota Mensual (Original)'
+    ))
+
+    # Con inyecciones
+    fig.add_trace(go.Scatter(
+        x=df_hipoteca_con_inyecciones['Mes'],
+        y=df_hipoteca_con_inyecciones['Capital_pendiente'],
+        mode='lines',
+        line=dict(color='blue'),
+        name='Capital Pendiente (Con Inyecciones)'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df_hipoteca_con_inyecciones['Mes'],
+        y=df_hipoteca_con_inyecciones['Cuota_mensual'],
+        mode='lines',
+        line=dict(color='red'),
+        name='Cuota Mensual (Con Inyecciones)'
+    ))
+
+    # Marcar inyecciones
+    inyecciones_meses = df_hipoteca_con_inyecciones[df_hipoteca_con_inyecciones['Inyeccion_capital'] > 0]
+    if not inyecciones_meses.empty:
+        fig.add_trace(go.Scatter(
+            x=inyecciones_meses['Mes'],
+            y=inyecciones_meses['Capital_pendiente'],
+            mode='markers',
+            marker=dict(color='green'),
+            name='Inyecciones de Capital'
+        ))
+
+    fig.update_layout(
+        title='Comparativa: Hipoteca Original vs. Hipoteca con Amortizaciones Anticipadas',
+        xaxis_title="Mes",
+        yaxis_title="Importe (euros)",
+        font_family="Arial",
+        font_color="black",
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
             x=0.01,
             bgcolor="black",
             bordercolor="black",
@@ -159,7 +351,7 @@ st.markdown("---")
 st.sidebar.title("Navegación")
 opcion = st.sidebar.selectbox(
     "Selecciona una opción:",
-    ["Máximo precio según sueldo", "Simulación de hipoteca", "Costes iniciales"]
+    ["Máximo precio según sueldo", "Simulación de hipoteca", "Amortizaciones anticipadas", "Costes iniciales"]
 )
 
 if opcion == "Máximo precio según sueldo":
@@ -245,6 +437,125 @@ elif opcion == "Simulación de hipoteca":
             ]).reset_index(drop=True)
             
             st.dataframe(df_display, use_container_width=True)
+
+elif opcion == "Amortizaciones anticipadas":
+    st.header("💸 Simulación con Amortizaciones Anticipadas (Inyecciones)")
+    
+    # Parámetros básicos de la hipoteca
+    st.subheader("Parámetros de la hipoteca")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        capital_inicial = st.number_input("Capital inicial (€)", min_value=10000, value=200000, step=5000, key="capital_inyec")
+        tasa_anual = st.number_input("Tasa de interés anual (%)", min_value=0.5, max_value=10.0, value=3.22, step=0.01, key="tasa_inyec")
+    
+    with col2:
+        plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1, key="plazo_inyec")
+    
+    # Configuración de inyecciones
+    st.subheader("Configuración de amortizaciones anticipadas")
+    
+    # Inicializar session state para inyecciones
+    if 'inyecciones' not in st.session_state:
+        st.session_state.inyecciones = []
+    
+    # Formulario para agregar inyecciones
+    with st.expander("➕ Agregar nueva amortización anticipada"):
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            mes_inyeccion = st.number_input("Mes de la inyección", min_value=1, max_value=plazo_anos*12, value=12, step=1)
+        with col2:
+            capital_inyectado = st.number_input("Capital a inyectar (€)", min_value=100, value=10000, step=100)
+        with col3:
+            tipo_inyeccion = st.selectbox("Tipo de reducción", ["cuota", "plazo"])
+        with col4:
+            st.write("")
+            st.write("")
+            if st.button("Agregar inyección"):
+                nueva_inyeccion = {
+                    'mes_inyeccion': mes_inyeccion,
+                    'capital_inyectado': capital_inyectado,
+                    'tipo_inyeccion': tipo_inyeccion
+                }
+                st.session_state.inyecciones.append(nueva_inyeccion)
+                st.success("Inyección agregada!")
+    
+    # Mostrar inyecciones actuales
+    if st.session_state.inyecciones:
+        st.subheader("Amortizaciones anticipadas configuradas:")
+        
+        # Crear DataFrame para mostrar las inyecciones
+        df_inyecciones = pd.DataFrame(st.session_state.inyecciones)
+        df_inyecciones['Capital (€)'] = df_inyecciones['capital_inyectado'].apply(lambda x: f"{x:,.0f}")
+        df_inyecciones['Mes'] = df_inyecciones['mes_inyeccion']
+        df_inyecciones['Tipo'] = df_inyecciones['tipo_inyeccion']
+        
+        # Mostrar tabla
+        st.dataframe(df_inyecciones[['Mes', 'Capital (€)', 'Tipo']], use_container_width=True, hide_index=True)
+        
+        # Botón para limpiar inyecciones
+        if st.button("🗑️ Limpiar todas las inyecciones"):
+            st.session_state.inyecciones = []
+            st.rerun()
+    
+    # Botón para simular
+    if st.button("🚀 Simular con amortizaciones anticipadas"):
+        if not st.session_state.inyecciones:
+            st.warning("Agrega al menos una amortización anticipada para comparar.")
+        else:
+            plazo_meses = plazo_anos * 12
+            cuota_inicial = cuota_mensual(capital_inicial, tasa_anual, plazo_meses)
+            
+            try:
+                # Simulación original (sin inyecciones)
+                df_original = simulacion_hipoteca_multiple_inyeccion(
+                    capital_inicial, tasa_anual, plazo_meses, cuota_inicial, [])
+                
+                # Simulación con inyecciones
+                df_con_inyecciones = simulacion_hipoteca_multiple_inyeccion(
+                    capital_inicial, tasa_anual, plazo_meses, cuota_inicial, st.session_state.inyecciones)
+                
+                # Calcular ahorros
+                ahorro_total, intereses_sin, intereses_con = calcular_ahorro_intereses_multiple_inyeccion(
+                    capital_inicial, tasa_anual, plazo_meses, cuota_inicial, st.session_state.inyecciones)
+                
+                # Métricas de comparación
+                st.subheader("📈 Resultados de la simulación")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Ahorro en intereses", f"{ahorro_total:,.2f} €")
+                with col2:
+                    st.metric("Intereses originales", f"{intereses_sin:,.2f} €")
+                with col3:
+                    st.metric("Intereses con inyecciones", f"{intereses_con:,.2f} €")
+                with col4:
+                    porcentaje_ahorro = (ahorro_total / intereses_sin) * 100 if intereses_sin > 0 else 0
+                    st.metric("% Ahorro", f"{porcentaje_ahorro:.1f}%")
+                
+                # Gráfico de comparación
+                fig_comparacion = plot_comparacion(df_original, df_con_inyecciones)
+                st.plotly_chart(fig_comparacion, use_container_width=True)
+                
+                # Información adicional
+                st.subheader("ℹ️ Información adicional")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("**Hipoteca original:**")
+                    st.write(f"- Duración: {len(df_original)} meses ({len(df_original)/12:.1f} años)")
+                    st.write(f"- Total pagado: {intereses_sin + capital_inicial:,.2f} €")
+                
+                with col2:
+                    st.write("**Hipoteca con inyecciones:**")
+                    st.write(f"- Duración: {len(df_con_inyecciones)} meses ({len(df_con_inyecciones)/12:.1f} años)")
+                    st.write(f"- Total pagado: {intereses_con + capital_inicial + sum([inj['capital_inyectado'] for inj in st.session_state.inyecciones]):,.2f} €")
+                    meses_ahorrados = len(df_original) - len(df_con_inyecciones)
+                    st.write(f"- Tiempo ahorrado: {meses_ahorrados} meses ({meses_ahorrados/12:.1f} años)")
+                
+            except Exception as e:
+                st.error(f"Error en la simulación: {str(e)}")
 
 elif opcion == "Costes iniciales":
     st.header("💸 Estimación de costes iniciales")

@@ -147,7 +147,7 @@ def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inici
     for mes in range(1, min(plazo_inicial + 1, len(euribor_scenario) + 1)):
         mes_actual += 1
         
-        if capital_pendiente <= 0:
+        if capital_pendiente <= 0 or plazo_restante <= 0:
             break
         
         # Get current Euribor and calculate rate
@@ -155,7 +155,7 @@ def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inici
         tasa_anual_actual = euribor_actual + spread
         
         # Recalculate payment annually
-        if mes % 12 == 1 and mes > 1:
+        if mes % 12 == 1 and mes > 1 and plazo_restante > 0:
             cuota_mensual_fija = cuota_mensual(capital_pendiente, tasa_anual_actual, plazo_restante)
         
         # Check for injections
@@ -209,9 +209,12 @@ def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inici
             
             if opcion_reduccion_actual == 'cuota':
                 plazo_restante_recalculo = max(plazo_inicial - mes_actual, 1)
-                cuota_mensual_fija = cuota_mensual(capital_pendiente, tasa_anual_actual, plazo_restante_recalculo)
+                if plazo_restante_recalculo > 0:
+                    cuota_mensual_fija = cuota_mensual(capital_pendiente, tasa_anual_actual, plazo_restante_recalculo)
             elif opcion_reduccion_actual == 'plazo':
-                plazo_restante = calcular_plazo(capital_pendiente, tasa_anual_actual, cuota_mensual_fija)
+                nuevo_plazo = calcular_plazo(capital_pendiente, tasa_anual_actual, cuota_mensual_fija)
+                if nuevo_plazo > 0:
+                    plazo_restante = nuevo_plazo
     
     return pd.DataFrame(registros)
 
@@ -268,15 +271,24 @@ def plot_monte_carlo_results(stats_df):
         line=dict(color='blue', width=2)
     ))
     
-    # Confidence band for monthly payment
+    # Upper bound for monthly payment
     fig.add_trace(go.Scatter(
-        x=list(stats_df['Mes']) + list(stats_df['Mes'][::-1]),
-        y=list(stats_df['Cuota_mensual_<lambda_0>']) + list(stats_df['Cuota_mensual_<lambda_1>'][::-1]),
+        x=stats_df['Mes'],
+        y=stats_df['Cuota_mensual_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(0,100,80,0.2)'),
+        showlegend=False
+    ))
+    
+    # Lower bound for monthly payment
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Cuota_mensual_<lambda_0>'],
+        mode='lines',
         fill='tonexty',
         fillcolor='rgba(0,100,80,0.2)',
-        line=dict(color='rgba(255,255,255,0)'),
-        name='Cuota Mensual (90% CI)',
-        showlegend=True
+        line=dict(color='rgba(0,100,80,0.2)'),
+        name='Cuota Mensual (90% CI)'
     ))
     
     # Monthly interest
@@ -288,15 +300,24 @@ def plot_monte_carlo_results(stats_df):
         line=dict(color='red', width=2)
     ))
     
-    # Confidence band for interest
+    # Upper bound for interest
     fig.add_trace(go.Scatter(
-        x=list(stats_df['Mes']) + list(stats_df['Mes'][::-1]),
-        y=list(stats_df['Intereses_mensuales_<lambda_0>']) + list(stats_df['Intereses_mensuales_<lambda_1>'][::-1]),
+        x=stats_df['Mes'],
+        y=stats_df['Intereses_mensuales_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(255,0,0,0.2)'),
+        showlegend=False
+    ))
+    
+    # Lower bound for interest
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Intereses_mensuales_<lambda_0>'],
+        mode='lines',
         fill='tonexty',
         fillcolor='rgba(255,0,0,0.2)',
-        line=dict(color='rgba(255,255,255,0)'),
-        name='Intereses Mensuales (90% CI)',
-        showlegend=True
+        line=dict(color='rgba(255,0,0,0.2)'),
+        name='Intereses Mensuales (90% CI)'
     ))
     
     # Monthly amortization
@@ -308,15 +329,24 @@ def plot_monte_carlo_results(stats_df):
         line=dict(color='green', width=2)
     ))
     
-    # Confidence band for amortization
+    # Upper bound for amortization
     fig.add_trace(go.Scatter(
-        x=list(stats_df['Mes']) + list(stats_df['Mes'][::-1]),
-        y=list(stats_df['Amortizacion_mensual_<lambda_0>']) + list(stats_df['Amortizacion_mensual_<lambda_1>'][::-1]),
+        x=stats_df['Mes'],
+        y=stats_df['Amortizacion_mensual_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(0,255,0,0.2)'),
+        showlegend=False
+    ))
+    
+    # Lower bound for amortization
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Amortizacion_mensual_<lambda_0>'],
+        mode='lines',
         fill='tonexty',
         fillcolor='rgba(0,255,0,0.2)',
-        line=dict(color='rgba(255,255,255,0)'),
-        name='Amortización Mensual (90% CI)',
-        showlegend=True
+        line=dict(color='rgba(0,255,0,0.2)'),
+        name='Amortización Mensual (90% CI)'
     ))
     
     fig.update_layout(
@@ -325,10 +355,10 @@ def plot_monte_carlo_results(stats_df):
         yaxis_title='Importe (€)',
         hovermode='x unified',
         legend=dict(
-            yanchor="top",
-            y=0.99,
-            xanchor="left",
-            x=0.01
+            # yanchor="top",
+            # y=0.99,
+            # xanchor="left",
+            # x=0.01
         )
     )
     
@@ -346,16 +376,25 @@ def plot_euribor_evolution(stats_df):
         name='Euribor Medio',
         line=dict(color='purple', width=2)
     ))
-    
-    # Confidence band
+
+    # Upper bound for Euribor
     fig.add_trace(go.Scatter(
-        x=list(stats_df['Mes']) + list(stats_df['Mes'][::-1]),
-        y=list(stats_df['Euribor_<lambda_0>']) + list(stats_df['Euribor_<lambda_1>'][::-1]),
+        x=stats_df['Mes'],
+        y=stats_df['Euribor_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(128,0,128,0.2)'),
+        showlegend=False
+    ))
+
+    # Lower bound for Euribor
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Euribor_<lambda_0>'],
+        mode='lines',
         fill='tonexty',
         fillcolor='rgba(128,0,128,0.2)',
-        line=dict(color='rgba(255,255,255,0)'),
-        name='Euribor (90% CI)',
-        showlegend=True
+        line=dict(color='rgba(128,0,128,0.2)'),
+        name='Euribor (90% CI)'
     ))
     
     fig.update_layout(
@@ -746,6 +785,131 @@ elif opcion == "Simulación de hipoteca":
             
             st.dataframe(df_display, use_container_width=True)
 
+elif opcion == "Amortizaciones anticipadas":
+    st.header("💸 Simulación con Amortizaciones Anticipadas (Inyecciones)")
+    
+    # Parámetros básicos de la hipoteca
+    st.subheader("Parámetros de la hipoteca")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        capital_inicial = st.number_input("Capital inicial (€)", min_value=10000, value=200000, step=5000, key="capital_inyec")
+        tasa_anual = st.number_input("Tasa de interés anual (%)", min_value=0.5, max_value=10.0, value=3.22, step=0.01, key="tasa_inyec")
+    
+    with col2:
+        plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1, key="plazo_inyec")
+    
+    # Configuración de inyecciones
+    st.subheader("Configuración de amortizaciones anticipadas")
+    
+    # Inicializar session state para inyecciones
+    if 'inyecciones' not in st.session_state:
+        st.session_state.inyecciones = []
+    
+    # Formulario para agregar inyecciones
+    with st.expander("➕ Agregar nueva amortización anticipada"):
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            mes_inyeccion = st.number_input("Mes de la inyección", min_value=1, max_value=plazo_anos*12, value=48, step=1)
+        with col2:
+            capital_inyectado = st.number_input("Capital a inyectar (€)", min_value=100, value=20000, step=100)
+        with col3:
+            tipo_inyeccion = st.selectbox("Tipo de reducción", ["cuota", "plazo"])
+        with col4:
+            st.write("")
+            st.write("")
+            if st.button("Agregar inyección"):
+                # Check if there's already an injection for this month
+                mes_exists = any(inj['mes_inyeccion'] == mes_inyeccion for inj in st.session_state.inyecciones)
+                
+                if mes_exists:
+                    st.error(f"Ya existe una inyección para el mes {mes_inyeccion}")
+                else:
+                    nueva_inyeccion = {
+                        'mes_inyeccion': mes_inyeccion,
+                        'capital_inyectado': capital_inyectado,
+                        'tipo_inyeccion': tipo_inyeccion
+                    }
+                    st.session_state.inyecciones.append(nueva_inyeccion)
+                    st.success("Inyección agregada!")
+    
+    # Mostrar inyecciones actuales
+    if st.session_state.inyecciones:
+        st.subheader("Amortizaciones anticipadas configuradas:")
+        
+        # Crear DataFrame para mostrar las inyecciones
+        df_inyecciones = pd.DataFrame(st.session_state.inyecciones)
+        df_inyecciones['Capital (€)'] = df_inyecciones['capital_inyectado'].apply(lambda x: f"{x:,.0f}")
+        df_inyecciones['Mes'] = df_inyecciones['mes_inyeccion']
+        df_inyecciones['Tipo'] = df_inyecciones['tipo_inyeccion']
+        
+        # Mostrar tabla
+        st.dataframe(df_inyecciones[['Mes', 'Capital (€)', 'Tipo']], use_container_width=True, hide_index=True)
+        
+        # Botón para limpiar inyecciones
+        if st.button("🗑️ Limpiar todas las inyecciones"):
+            st.session_state.inyecciones = []
+            st.rerun()
+    
+    # Botón para simular
+    if st.button("🚀 Simular con amortizaciones anticipadas"):
+        if not st.session_state.inyecciones:
+            st.warning("Agrega al menos una amortización anticipada para comparar.")
+        else:
+            plazo_meses = plazo_anos * 12
+            cuota_inicial = cuota_mensual(capital_inicial, tasa_anual, plazo_meses)
+            
+            try:
+                # Simulación original (sin inyecciones)
+                df_original = simulacion_hipoteca_multiple_inyeccion(
+                    capital_inicial, tasa_anual, plazo_meses, cuota_inicial, [])
+                
+                # Simulación con inyecciones
+                df_con_inyecciones = simulacion_hipoteca_multiple_inyeccion(
+                    capital_inicial, tasa_anual, plazo_meses, cuota_inicial, st.session_state.inyecciones)
+                
+                # Calcular ahorros
+                ahorro_total, intereses_sin, intereses_con = calcular_ahorro_intereses_multiple_inyeccion(
+                    capital_inicial, tasa_anual, plazo_meses, cuota_inicial, st.session_state.inyecciones)
+                
+                # Métricas de comparación
+                st.subheader("📈 Resultados de la simulación")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Ahorro en intereses", f"{ahorro_total:,.2f} €")
+                with col2:
+                    st.metric("Intereses originales", f"{intereses_sin:,.2f} €")
+                with col3:
+                    st.metric("Intereses con inyecciones", f"{intereses_con:,.2f} €")
+                with col4:
+                    porcentaje_ahorro = (ahorro_total / intereses_sin) * 100 if intereses_sin > 0 else 0
+                    st.metric("% Ahorro", f"{porcentaje_ahorro:.1f}%")
+                
+                # Gráfico de comparación
+                fig_comparacion = plot_comparacion(df_original, df_con_inyecciones)
+                st.plotly_chart(fig_comparacion, use_container_width=True)
+                
+                # Información adicional
+                st.subheader("ℹ️ Información adicional")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("**Hipoteca original:**")
+                    st.write(f"- Duración: {len(df_original)} meses ({len(df_original)/12:.1f} años)")
+                    st.write(f"- Total pagado: {intereses_sin + capital_inicial:,.2f} €")
+                
+                with col2:
+                    st.write("**Hipoteca con inyecciones:**")
+                    st.write(f"- Duración: {len(df_con_inyecciones)} meses ({len(df_con_inyecciones)/12:.1f} años)")
+                    st.write(f"- Total pagado: {intereses_con + capital_inicial + sum([inj['capital_inyectado'] for inj in st.session_state.inyecciones]):,.2f} €")
+                    meses_ahorrados = len(df_original) - len(df_con_inyecciones)
+                    st.write(f"- Tiempo ahorrado: {meses_ahorrados} meses ({meses_ahorrados/12:.1f} años)")
+                
+            except Exception as e:
+                st.error(f"Error en la simulación: {str(e)}")
+
 elif opcion == "Monte Carlo - Euribor Estocástico":
     st.header("🎲 Simulación Monte Carlo - Euribor Estocástico")
     
@@ -809,13 +973,19 @@ elif opcion == "Monte Carlo - Euribor Estocástico":
             st.write("")
             st.write("")
             if st.button("Agregar", key="add_mc"):
-                nueva_inyeccion = {
-                    'mes_inyeccion': mes_inyeccion_mc,
-                    'capital_inyectado': capital_inyectado_mc,
-                    'tipo_inyeccion': tipo_inyeccion_mc
-                }
-                st.session_state.inyecciones_mc.append(nueva_inyeccion)
-                st.success("Inyección agregada!")
+                # Check if there's already an injection for this month
+                mes_exists = any(inj['mes_inyeccion'] == mes_inyeccion_mc for inj in st.session_state.inyecciones_mc)
+                
+                if mes_exists:
+                    st.error(f"Ya existe una inyección para el mes {mes_inyeccion_mc}")
+                else:
+                    nueva_inyeccion = {
+                        'mes_inyeccion': mes_inyeccion_mc,
+                        'capital_inyectado': capital_inyectado_mc,
+                        'tipo_inyeccion': tipo_inyeccion_mc
+                    }
+                    st.session_state.inyecciones_mc.append(nueva_inyeccion)
+                    st.success("Inyección agregada!")
     
     # Mostrar inyecciones configuradas
     if st.session_state.inyecciones_mc:

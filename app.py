@@ -496,7 +496,7 @@ def simulacion_hipoteca_multiple_inyeccion(capital_inicial, tasa, plazo_inicial,
                 plazo_restante_recalculo = max(plazo_inicial - mes_actual, 1)
                 cuota_actual = cuota_mensual(nuevo_capital, tasa, plazo_restante_recalculo)
             elif opcion_reduccion_actual == 'plazo':
-                cuota_actual_recalculo = cuota_mensual_fija # Mantenemos la cuota actual RECALCULADA previamente por el euribor
+                cuota_actual_recalculo = cuota_actual # Mantenemos la cuota actual RECALCULADA previamente por el euribor
                 plazo_restante = calcular_plazo(nuevo_capital, tasa, cuota_actual_recalculo) # Usar la tasa anual ACTUAL
                 plazo_inicial = mes_actual + plazo_restante # Ajustamos plazo inicial para futuras inyecciones
 

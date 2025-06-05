@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import math
 import numpy as np
+from scipy import stats
 
 # Core calculation functions from your notebook
 def cuota_mensual(capital, tasa, plazo):
@@ -77,6 +78,334 @@ def simulacion_hipoteca_simple(capital_inicial, tasa, plazo_inicial, cuota_inici
     
     return pd.DataFrame(registros)
 
+def generate_euribor_scenario(initial_euribor, plazo_anos, distribution_type, **params):
+    """Generate a single Euribor scenario based on distribution type"""
+    np.random.seed(None)  # Ensure different random seeds
+    
+    if distribution_type == "Gaussian":
+        volatility = params.get('volatility', 0.5)
+        drift = params.get('drift', 0.0)
+        
+        # Generate monthly changes
+        monthly_changes = np.random.normal(drift/12, volatility/np.sqrt(12), plazo_anos * 12)
+        
+        # Apply changes cumulatively
+        euribor_values = [initial_euribor]
+        for change in monthly_changes:
+            new_value = max(euribor_values[-1] + change, -1.0)  # Floor at -1%
+            euribor_values.append(new_value)
+        
+        return euribor_values[1:]  # Remove initial value
+    
+    elif distribution_type == "Mean Reverting":
+        mean_level = params.get('mean_level', initial_euribor)
+        reversion_speed = params.get('reversion_speed', 0.1)
+        volatility = params.get('volatility', 0.3)
+        
+        euribor_values = [initial_euribor]
+        dt = 1/12  # Monthly time step
+        
+        for _ in range(plazo_anos * 12):
+            current = euribor_values[-1]
+            drift_term = reversion_speed * (mean_level - current) * dt
+            random_term = volatility * np.sqrt(dt) * np.random.normal()
+            new_value = max(current + drift_term + random_term, -1.0)
+            euribor_values.append(new_value)
+        
+        return euribor_values[1:]
+    
+    elif distribution_type == "Uniform Random Walk":
+        max_change = params.get('max_change', 0.25)
+        
+        euribor_values = [initial_euribor]
+        for _ in range(plazo_anos * 12):
+            change = np.random.uniform(-max_change/12, max_change/12)
+            new_value = max(euribor_values[-1] + change, -1.0)
+            euribor_values.append(new_value)
+        
+        return euribor_values[1:]
+    
+    else:  # Constant
+        return [initial_euribor] * (plazo_anos * 12)
+
+def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inicial, 
+                                           euribor_scenario, inyecciones=None):
+    """Simulate variable mortgage with given Euribor scenario"""
+    if inyecciones is None:
+        inyecciones = []
+    
+    registros = []
+    capital_pendiente = capital_inicial
+    mes_actual = 0
+    plazo_restante = plazo_inicial
+    opcion_reduccion_actual = None
+    
+    # Calculate initial payment
+    tasa_inicial = euribor_scenario[0] + spread
+    cuota_mensual_fija = cuota_mensual(capital_inicial, tasa_inicial, plazo_inicial)
+    
+    for mes in range(1, min(plazo_inicial + 1, len(euribor_scenario) + 1)):
+        mes_actual += 1
+        
+        if capital_pendiente <= 0 or plazo_restante <= 0:
+            break
+        
+        # Get current Euribor and calculate rate
+        euribor_actual = euribor_scenario[mes - 1]
+        tasa_anual_actual = euribor_actual + spread
+        
+        # Recalculate payment annually
+        if mes % 12 == 1 and mes > 1 and plazo_restante > 0:
+            cuota_mensual_fija = cuota_mensual(capital_pendiente, tasa_anual_actual, plazo_restante)
+        
+        # Check for injections
+        inyeccion_mes = 0
+        tipo_inyeccion_mes = None
+        for inyeccion in inyecciones:
+            if inyeccion['mes_inyeccion'] == mes_actual:
+                inyeccion_mes = inyeccion['capital_inyectado']
+                tipo_inyeccion_mes = inyeccion['tipo_inyeccion']
+        
+        # Apply injection
+        if inyeccion_mes > 0:
+            if inyeccion_mes > capital_pendiente:
+                inyeccion_mes = capital_pendiente
+            capital_pendiente -= inyeccion_mes
+        
+        if capital_pendiente <= 0:
+            registros.append({
+                'Mes': mes_actual,
+                'Euribor': euribor_actual,
+                'Tasa_Anual': tasa_anual_actual,
+                'Capital_pendiente': 0,
+                'Cuota_mensual': 0,
+                'Intereses_mensuales': 0,
+                'Amortizacion_mensual': 0,
+                'Inyeccion_capital': inyeccion_mes
+            })
+            break
+        
+        interes = intereses_mensuales(capital_pendiente, tasa_anual_actual)
+        amortizacion = min(cuota_mensual_fija - interes, capital_pendiente)
+        
+        registros.append({
+            'Mes': mes_actual,
+            'Euribor': euribor_actual,
+            'Tasa_Anual': tasa_anual_actual,
+            'Capital_pendiente': capital_pendiente,
+            'Cuota_mensual': cuota_mensual_fija,
+            'Intereses_mensuales': interes,
+            'Amortizacion_mensual': amortizacion,
+            'Inyeccion_capital': inyeccion_mes
+        })
+        
+        capital_pendiente -= amortizacion
+        plazo_restante -= 1
+        
+        # Recalculate after injection
+        if (inyeccion_mes > 0 or tipo_inyeccion_mes) and capital_pendiente > 0:
+            if tipo_inyeccion_mes:
+                opcion_reduccion_actual = tipo_inyeccion_mes
+            
+            if opcion_reduccion_actual == 'cuota':
+                plazo_restante_recalculo = max(plazo_inicial - mes_actual, 1)
+                if plazo_restante_recalculo > 0:
+                    cuota_mensual_fija = cuota_mensual(capital_pendiente, tasa_anual_actual, plazo_restante_recalculo)
+            elif opcion_reduccion_actual == 'plazo':
+                nuevo_plazo = calcular_plazo(capital_pendiente, tasa_anual_actual, cuota_mensual_fija)
+                if nuevo_plazo > 0:
+                    plazo_restante = nuevo_plazo
+    
+    return pd.DataFrame(registros)
+
+def run_monte_carlo_simulation(capital_inicial, spread, plazo_anos, initial_euribor, 
+                              distribution_type, num_simulations, inyecciones=None, **dist_params):
+    """Run Monte Carlo simulation for variable mortgage"""
+    if inyecciones is None:
+        inyecciones = []
+    
+    all_simulations = []
+    
+    for i in range(num_simulations):
+        # Generate Euribor scenario
+        euribor_scenario = generate_euribor_scenario(
+            initial_euribor, plazo_anos, distribution_type, **dist_params
+        )
+        
+        # Run mortgage simulation
+        df_sim = simulacion_hipoteca_variable_montecarlo(
+            capital_inicial, spread, plazo_anos * 12, euribor_scenario, inyecciones
+        )
+        
+        df_sim['Simulation'] = i
+        all_simulations.append(df_sim)
+    
+    return pd.concat(all_simulations, ignore_index=True)
+
+def calculate_simulation_statistics(df_all_sims):
+    """Calculate mean and confidence intervals from simulation results"""
+    # Group by month and calculate statistics
+    stats_df = df_all_sims.groupby('Mes').agg({
+        'Cuota_mensual': ['mean', 'std', lambda x: np.percentile(x, 5), lambda x: np.percentile(x, 95)],
+        'Intereses_mensuales': ['mean', 'std', lambda x: np.percentile(x, 5), lambda x: np.percentile(x, 95)],
+        'Amortizacion_mensual': ['mean', 'std', lambda x: np.percentile(x, 5), lambda x: np.percentile(x, 95)],
+        'Euribor': ['mean', 'std', lambda x: np.percentile(x, 5), lambda x: np.percentile(x, 95)]
+    }).round(2)
+    
+    # Flatten column names
+    stats_df.columns = ['_'.join(col).strip() for col in stats_df.columns.values]
+    stats_df = stats_df.reset_index()
+    
+    return stats_df
+
+def plot_monte_carlo_results(stats_df):
+    """Create plot with mean values and confidence bands"""
+    fig = go.Figure()
+    
+    # Monthly payment
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Cuota_mensual_mean'],
+        mode='lines',
+        name='Cuota Mensual (Media)',
+        line=dict(color='blue', width=2)
+    ))
+    
+    # Upper bound for monthly payment
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Cuota_mensual_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(0,100,80,0.2)'),
+        showlegend=False
+    ))
+    
+    # Lower bound for monthly payment
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Cuota_mensual_<lambda_0>'],
+        mode='lines',
+        fill='tonexty',
+        fillcolor='rgba(0,100,80,0.2)',
+        line=dict(color='rgba(0,100,80,0.2)'),
+        name='Cuota Mensual (90% CI)'
+    ))
+    
+    # Monthly interest
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Intereses_mensuales_mean'],
+        mode='lines',
+        name='Intereses Mensuales (Media)',
+        line=dict(color='red', width=2)
+    ))
+    
+    # Upper bound for interest
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Intereses_mensuales_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(255,0,0,0.2)'),
+        showlegend=False
+    ))
+    
+    # Lower bound for interest
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Intereses_mensuales_<lambda_0>'],
+        mode='lines',
+        fill='tonexty',
+        fillcolor='rgba(255,0,0,0.2)',
+        line=dict(color='rgba(255,0,0,0.2)'),
+        name='Intereses Mensuales (90% CI)'
+    ))
+    
+    # Monthly amortization
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Amortizacion_mensual_mean'],
+        mode='lines',
+        name='Amortización Mensual (Media)',
+        line=dict(color='green', width=2)
+    ))
+    
+    # Upper bound for amortization
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Amortizacion_mensual_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(0,255,0,0.2)'),
+        showlegend=False
+    ))
+    
+    # Lower bound for amortization
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Amortizacion_mensual_<lambda_0>'],
+        mode='lines',
+        fill='tonexty',
+        fillcolor='rgba(0,255,0,0.2)',
+        line=dict(color='rgba(0,255,0,0.2)'),
+        name='Amortización Mensual (90% CI)'
+    ))
+    
+    fig.update_layout(
+        title='Simulación Monte Carlo - Hipoteca Variable con Euribor Estocástico',
+        xaxis_title='Mes',
+        yaxis_title='Importe (€)',
+        hovermode='x unified',
+        legend=dict(
+            # yanchor="top",
+            # y=0.99,
+            # xanchor="left",
+            # x=0.01
+        )
+    )
+    
+    return fig
+
+def plot_euribor_evolution(stats_df):
+    """Plot Euribor evolution with confidence bands"""
+    fig = go.Figure()
+    
+    # Mean Euribor
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Euribor_mean'],
+        mode='lines',
+        name='Euribor Medio',
+        line=dict(color='purple', width=2)
+    ))
+
+    # Upper bound for Euribor
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Euribor_<lambda_1>'],
+        mode='lines',
+        line=dict(color='rgba(128,0,128,0.2)'),
+        showlegend=False
+    ))
+
+    # Lower bound for Euribor
+    fig.add_trace(go.Scatter(
+        x=stats_df['Mes'],
+        y=stats_df['Euribor_<lambda_0>'],
+        mode='lines',
+        fill='tonexty',
+        fillcolor='rgba(128,0,128,0.2)',
+        line=dict(color='rgba(128,0,128,0.2)'),
+        name='Euribor (90% CI)'
+    ))
+    
+    fig.update_layout(
+        title='Evolución del Euribor - Simulación Monte Carlo',
+        xaxis_title='Mes',
+        yaxis_title='Euribor (%)',
+        hovermode='x unified'
+    )
+    
+    return fig
+
 def simulacion_hipoteca_multiple_inyeccion(capital_inicial, tasa, plazo_inicial,
                                             cuota_inicial, inyecciones):
     """
@@ -102,7 +431,7 @@ def simulacion_hipoteca_multiple_inyeccion(capital_inicial, tasa, plazo_inicial,
         if 'mes_inyeccion' not in inyeccion:
             raise ValueError("Cada inyección debe tener 'mes_inyeccion'")
         if 'capital_inyectado' not in inyeccion:
-            inyeccion['capital_inyectado'] = 0
+            inyeccion['capital_inyectado'] = 0 # Asumir 0 si no se especifica
         if 'tipo_inyeccion' in inyeccion and inyeccion['tipo_inyeccion'] not in ['cuota', 'plazo']:
             raise ValueError("Tipo de inyección debe ser 'cuota' o 'plazo' o None")
 
@@ -167,9 +496,9 @@ def simulacion_hipoteca_multiple_inyeccion(capital_inicial, tasa, plazo_inicial,
                 plazo_restante_recalculo = max(plazo_inicial - mes_actual, 1)
                 cuota_actual = cuota_mensual(nuevo_capital, tasa, plazo_restante_recalculo)
             elif opcion_reduccion_actual == 'plazo':
-                cuota_actual_recalculo = cuota_actual
-                plazo_restante = calcular_plazo(nuevo_capital, tasa, cuota_actual_recalculo)
-                plazo_inicial = mes_actual + plazo_restante
+                cuota_actual_recalculo = cuota_mensual_fija # Mantenemos la cuota actual RECALCULADA previamente por el euribor
+                plazo_restante = calcular_plazo(nuevo_capital, tasa, cuota_actual_recalculo) # Usar la tasa anual ACTUAL
+                plazo_inicial = mes_actual + plazo_restante # Ajustamos plazo inicial para futuras inyecciones
 
     return pd.DataFrame(registros)
 
@@ -368,7 +697,8 @@ st.markdown("---")
 st.sidebar.title("Navegación")
 opcion = st.sidebar.selectbox(
     "Selecciona una opción:",
-    ["Máximo precio según sueldo", "Simulación de hipoteca", "Amortizaciones anticipadas", "Costes iniciales"]
+    ["Máximo precio según sueldo", "Simulación de hipoteca", "Amortizaciones anticipadas", 
+     "Monte Carlo - Euribor Estocástico", "Costes iniciales"]
 )
 
 if opcion == "Máximo precio según sueldo":
@@ -579,6 +909,212 @@ elif opcion == "Amortizaciones anticipadas":
                 
             except Exception as e:
                 st.error(f"Error en la simulación: {str(e)}")
+
+elif opcion == "Monte Carlo - Euribor Estocástico":
+    st.header("🎲 Simulación Monte Carlo - Euribor Estocástico")
+    
+    # Parámetros básicos de la hipoteca
+    st.subheader("Parámetros de la hipoteca")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        capital_inicial = st.number_input("Capital inicial (€)", min_value=10000, value=200000, step=5000, key="capital_mc")
+        spread = st.number_input("Spread sobre Euribor (%)", min_value=0.1, max_value=5.0, value=1.5, step=0.1, key="spread_mc")
+    
+    with col2:
+        plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1, key="plazo_mc")
+        num_simulaciones = st.slider("Número de simulaciones", 10, 1000, 100, 10, key="num_sim")
+    
+    # Configuración del Euribor
+    st.subheader("Configuración del Euribor")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        initial_euribor = st.number_input("Euribor inicial (%)", min_value=-1.0, max_value=10.0, value=3.5, step=0.1, key="euribor_inicial")
+        distribution_type = st.selectbox(
+            "Tipo de distribución",
+            ["Gaussian", "Mean Reverting", "Uniform Random Walk", "Constant"],
+            key="dist_type"
+        )
+    
+    with col2:
+        if distribution_type == "Gaussian":
+            volatility = st.slider("Volatilidad anual (%)", 0.1, 2.0, 0.5, 0.1, key="volatility")
+            drift = st.slider("Deriva anual (%)", -1.0, 1.0, 0.0, 0.1, key="drift")
+            dist_params = {"volatility": volatility, "drift": drift}
+        elif distribution_type == "Mean Reverting":
+            mean_level = st.slider("Nivel medio (%)", 0.0, 8.0, 3.0, 0.1, key="mean_level")
+            reversion_speed = st.slider("Velocidad de reversión", 0.1, 1.0, 0.3, 0.1, key="reversion_speed")
+            volatility = st.slider("Volatilidad (%)", 0.1, 2.0, 0.5, 0.1, key="volatility_mr")
+            dist_params = {"mean_level": mean_level, "reversion_speed": reversion_speed, "volatility": volatility}
+        elif distribution_type == "Uniform Random Walk":
+            max_change = st.slider("Cambio máximo por mes (%)", 0.1, 1.0, 0.3, 0.1, key="max_change")
+            dist_params = {"max_change": max_change}
+        else:  # Constant
+            dist_params = {}
+    
+    # Configuración de inyecciones (opcional)
+    st.subheader("Amortizaciones anticipadas (opcional)")
+    
+    # Inicializar session state para inyecciones MC
+    if 'inyecciones_mc' not in st.session_state:
+        st.session_state.inyecciones_mc = []
+    
+    with st.expander("➕ Agregar amortización anticipada"):
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            mes_inyeccion_mc = st.number_input("Mes", min_value=1, max_value=plazo_anos*12, value=48, step=1, key="mes_mc")
+        with col2:
+            capital_inyectado_mc = st.number_input("Capital (€)", min_value=100, value=20000, step=100, key="capital_inj_mc")
+        with col3:
+            tipo_inyeccion_mc = st.selectbox("Tipo", ["cuota", "plazo"], key="tipo_mc")
+        with col4:
+            st.write("")
+            st.write("")
+            if st.button("Agregar", key="add_mc"):
+                # Check if there's already an injection for this month
+                mes_exists = any(inj['mes_inyeccion'] == mes_inyeccion_mc for inj in st.session_state.inyecciones_mc)
+                
+                if mes_exists:
+                    st.error(f"Ya existe una inyección para el mes {mes_inyeccion_mc}")
+                else:
+                    nueva_inyeccion = {
+                        'mes_inyeccion': mes_inyeccion_mc,
+                        'capital_inyectado': capital_inyectado_mc,
+                        'tipo_inyeccion': tipo_inyeccion_mc
+                    }
+                    st.session_state.inyecciones_mc.append(nueva_inyeccion)
+                    st.success("Inyección agregada!")
+    
+    # Mostrar inyecciones configuradas
+    if st.session_state.inyecciones_mc:
+        st.write("**Amortizaciones configuradas:**")
+        df_inj_mc = pd.DataFrame(st.session_state.inyecciones_mc)
+        st.dataframe(df_inj_mc[['mes_inyeccion', 'capital_inyectado', 'tipo_inyeccion']], 
+                    use_container_width=True, hide_index=True)
+        
+        if st.button("🗑️ Limpiar inyecciones", key="clear_mc"):
+            st.session_state.inyecciones_mc = []
+            st.rerun()
+    
+    # Ejecutar simulación
+    if st.button("🚀 Ejecutar simulación Monte Carlo", key="run_mc"):
+        with st.spinner("Ejecutando simulaciones..."):
+            try:
+                # Ejecutar simulaciones
+                all_results = run_monte_carlo_simulation(
+                    capital_inicial=capital_inicial,
+                    spread=spread, 
+                    plazo_anos=plazo_anos,
+                    initial_euribor=initial_euribor,
+                    distribution_type=distribution_type,
+                    num_simulations=num_simulaciones,
+                    inyecciones=st.session_state.inyecciones_mc if st.session_state.inyecciones_mc else None,
+                    **dist_params
+                )
+                
+                # Split the DataFrame into list of DataFrames by simulation number
+                simulation_dfs = [group for _, group in all_results.groupby('Simulation')]
+                
+                # Calcular estadísticas
+                stats_df = calculate_simulation_statistics(all_results)
+                
+                # Métricas resumen
+                st.subheader("📊 Resumen de resultados")
+                
+                duraciones = [len(df) for df in simulation_dfs]
+                intereses_totales = [df['Intereses_mensuales'].sum() for df in simulation_dfs]
+                pagos_iniciales = [df['Cuota_mensual'].iloc[0] for df in simulation_dfs]
+                euribor_final = [df['Euribor'].iloc[-1] for df in simulation_dfs]
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Duración promedio", f"{np.mean(duraciones)/12:.1f} años")
+                with col2:
+                    st.metric("Intereses totales promedio", f"{np.mean(intereses_totales):,.0f} €")
+                with col3:
+                    st.metric("Pago inicial promedio", f"{np.mean(pagos_iniciales):,.0f} €")
+                with col4:
+                    st.metric("Euribor final promedio", f"{np.mean(euribor_final):.2f}%")
+                
+                # Gráficos
+                st.subheader("📈 Evolución de pagos")
+                fig_payments = plot_monte_carlo_results(stats_df)
+                st.plotly_chart(fig_payments, use_container_width=True)
+                
+                st.subheader("📈 Evolución del Euribor")
+                fig_euribor = plot_euribor_evolution(stats_df)
+                st.plotly_chart(fig_euribor, use_container_width=True)
+                
+                # Estadísticas detalladas
+                st.subheader("📋 Estadísticas detalladas")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Intereses totales:**")
+                    st.write(f"- Media: {np.mean(intereses_totales):,.0f} €")
+                    st.write(f"- Mediana: {np.median(intereses_totales):,.0f} €")
+                    st.write(f"- Desv. estándar: {np.std(intereses_totales):,.0f} €")
+                    st.write(f"- Percentil 5: {np.percentile(intereses_totales, 5):,.0f} €")
+                    st.write(f"- Percentil 95: {np.percentile(intereses_totales, 95):,.0f} €")
+                
+                with col2:
+                    st.write("**Duración del préstamo:**")
+                    st.write(f"- Media: {np.mean(duraciones)/12:.1f} años")
+                    st.write(f"- Mediana: {np.median(duraciones)/12:.1f} años")
+                    st.write(f"- Desv. estándar: {np.std(duraciones)/12:.1f} años")
+                    st.write(f"- Percentil 5: {np.percentile(duraciones, 5)/12:.1f} años")
+                    st.write(f"- Percentil 95: {np.percentile(duraciones, 95)/12:.1f} años")
+                
+                # Análisis de riesgo
+                st.subheader("⚠️ Análisis de riesgo")
+                
+                percentiles = [10, 25, 50, 75, 90]
+                risk_data = []
+                for p in percentiles:
+                    risk_data.append({
+                        "Percentil": f"P{p}",
+                        "Intereses totales (€)": f"{np.percentile(intereses_totales, p):,.0f}",
+                        "Duración (años)": f"{np.percentile(duraciones, p)/12:.1f}"
+                    })
+                
+                df_risk = pd.DataFrame(risk_data)
+                st.dataframe(df_risk, use_container_width=True, hide_index=True)
+                
+                # Mostrar algunas simulaciones individuales
+                if st.checkbox("Mostrar simulaciones individuales (muestra)"):
+                    st.subheader("🔍 Simulaciones individuales (muestra)")
+                    
+                    num_mostrar = min(5, len(simulation_dfs))
+                    indices_muestra = np.random.choice(len(simulation_dfs), num_mostrar, replace=False)
+                    
+                    fig_individual = go.Figure()
+                    
+                    for i, idx in enumerate(indices_muestra):
+                        df_sim = simulation_dfs[idx]
+                        fig_individual.add_trace(go.Scatter(
+                            x=df_sim.index + 1,
+                            y=df_sim['Cuota_mensual'],
+                            mode='lines',
+                            name=f'Simulación {idx+1}',
+                            opacity=0.7
+                        ))
+                    
+                    fig_individual.update_layout(
+                        title='Muestra de simulaciones individuales - Cuota mensual',
+                        xaxis_title='Mes',
+                        yaxis_title='Cuota mensual (€)',
+                        hovermode='x unified'
+                    )
+                    
+                    st.plotly_chart(fig_individual, use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"Error en la simulación: {str(e)}")
+                st.write("Detalles del error:")
+                st.code(str(e))
 
 elif opcion == "Costes iniciales":
     st.header("💸 Estimación de costes iniciales")

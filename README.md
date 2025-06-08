@@ -5,9 +5,12 @@ Aplicación web interactiva para calcular y simular hipotecas basada en el noteb
 ## Características
 
 - 🏠 **Máximo precio según sueldo**: Calcula el precio máximo de vivienda que puedes permitirte
-- 📊 **Simulación de hipoteca**: Simula el comportamiento de tu hipoteca mes a mes
-- 💸 **Costes iniciales**: Estima todos los gastos asociados a la compra
+- 🎲 **Simulación de hipoteca**: Simula el comportamiento de tu hipoteca mes a mes
+- 📊 **Calcula amortización**: Calcula la amortización de tu hipoteca
+- 🚀 **Hipotecas fijas y variables**: Calcula tanto hipotecas fijas como variables
 - 📈 **Gráficos interactivos**: Visualiza la evolución de tu hipoteca
+- 💸 **Costes iniciales**: Estima todos los gastos asociados a la compra
+
 
 ## Instalación
 

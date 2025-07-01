@@ -64,7 +64,7 @@ def show_page():
                 with col2:
                     st.write("**Hipoteca con inyecciones:**")
                     st.write(f"- Duración: {len(df_con_inyecciones)} meses ({len(df_con_inyecciones)/12:.1f} años)")
-                    st.write(f"- Total pagado: {intereses_con + capital_inicial + sum([inj['capital_inyectado'] for inj in st.session_state.inyecciones]):,.2f} €")
+                    st.write(f"- Total pagado: {intereses_con + capital_inicial:,.2f} €")
                     meses_ahorrados = len(df_original) - len(df_con_inyecciones)
                     st.write(f"- Tiempo ahorrado: {meses_ahorrados} meses ({meses_ahorrados/12:.1f} años)")
                 

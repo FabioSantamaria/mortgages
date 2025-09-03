@@ -16,14 +16,15 @@ st.markdown("---")
 st.sidebar.title("Navegación")
 opcion = st.sidebar.selectbox(
     "Selecciona una opción:",
-    ["Máximo precio según sueldo", "Simulación de hipoteca", "Amortizaciones anticipadas", 
-     "Monte Carlo - Euribor Estocástico", "Costes iniciales"]
+    ["Simulación de hipoteca", 
+    "Amortizaciones anticipadas", 
+    "Monte Carlo - Euribor Estocástico", 
+    "Costes iniciales", 
+    "Máximo precio según sueldo"]
 )
 
 # Route to appropriate page
-if opcion == "Máximo precio según sueldo":
-    max_price.show_page()
-elif opcion == "Simulación de hipoteca":
+if opcion == "Simulación de hipoteca":
     simulation.show_page()
 elif opcion == "Amortizaciones anticipadas":
     early_payments.show_page()
@@ -31,6 +32,8 @@ elif opcion == "Monte Carlo - Euribor Estocástico":
     monte_carlo_page.show_page()
 elif opcion == "Costes iniciales":
     initial_costs.show_page()
+elif opcion == "Máximo precio según sueldo":
+    max_price.show_page()
 
 # Footer
 st.markdown("---")

@@ -7,7 +7,7 @@ def create_mortgage_inputs():
     
     with col1:
         capital_inicial = st.number_input("Capital inicial (€)", min_value=10000, value=200000, step=5000)
-        tasa_anual = st.number_input("Tasa de interés anual (%)", min_value=0.5, max_value=10.0, value=3.22, step=0.01)
+        tasa_anual = st.number_input("Tasa de interés anual (%)", min_value=0.5, max_value=10.0, value=2.00, step=0.01)
     
     with col2:
         plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1)

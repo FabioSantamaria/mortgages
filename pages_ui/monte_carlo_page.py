@@ -21,11 +21,11 @@ def show_page():
     st.subheader("Parámetros de la simulación")
     col1, col2 = st.columns(2)
     with col1:
-        initial_euribor = st.number_input("Euribor inicial (%)", min_value=-1.0, max_value=10.0, value=3.5, step=0.1)
+        initial_euribor = st.number_input("Euribor inicial (%)", min_value=-1.0, max_value=10.0, value=2.2, step=0.1)
     with col2:
         distribution_type = st.selectbox(
             "Tipo de distribución",
-            ["Constant", "Gaussian", "Mean Reverting", "Uniform Random Walk"]
+            ["Uniform Random Walk", "Constant", "Gaussian", "Mean Reverting"]
         )
     
     # Distribution parameters

@@ -35,7 +35,7 @@ def show_page():
             # Show table if requested
             if mostrar_tabla:
                 st.subheader("Tabla de amortización")
-                st.dataframe(df_simulacion, use_container_width=True)
+                st.dataframe(df_simulacion, use_container_width=True, hide_index=True)
                 
         except Exception as e:
             st.error(f"Error en la simulación: {str(e)}")

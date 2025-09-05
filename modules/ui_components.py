@@ -11,20 +11,23 @@ def create_mortgage_inputs():
     
     with col2:
         plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1)
+        costes_fijos_mensuales = st.number_input("Costes fijos mensuales (€)", min_value=0, value=50, step=10, help="Seguros obligatorios, comisiones, etc.")
     
-    return capital_inicial, tasa_anual, plazo_anos
+    return capital_inicial, tasa_anual, plazo_anos, costes_fijos_mensuales
 
-def display_mortgage_summary(capital_inicial, tasa_anual, plazo_anos, cuota_mensual_calc, total_intereses, total_pagado):
-    """Display mortgage summary metrics"""
-    col1, col2, col3, col4 = st.columns(4)
+def display_mortgage_summary(capital_inicial, tasa_anual, plazo_anos, cuota_mensual_calc, total_intereses, total_pagado, costes_fijos_mensuales=0):
+    """Display mortgage summary metrics including fixed costs"""
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.metric("Capital inicial", f"{capital_inicial:,.0f} €")
     with col2:
         st.metric("Cuota mensual", f"{cuota_mensual_calc:,.2f} €")
     with col3:
-        st.metric("Total intereses", f"{total_intereses:,.2f} €")
+        st.metric("Costes fijos/mes", f"{costes_fijos_mensuales:,.2f} €")
     with col4:
+        st.metric("Total intereses", f"{total_intereses:,.2f} €")
+    with col5:
         st.metric("Total pagado", f"{total_pagado:,.2f} €")
 
 def create_early_payment_inputs(plazo_anos):

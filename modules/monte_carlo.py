@@ -53,7 +53,7 @@ def generate_euribor_scenario(initial_euribor, plazo_anos, distribution_type, **
         return [initial_euribor] * (plazo_anos * 12)
 
 def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inicial, 
-                                           euribor_scenario, inyecciones=None):
+                                           euribor_scenario, inyecciones=None, costes_fijos_mensuales=0):
     """Simulate variable mortgage with given Euribor scenario"""
     if inyecciones is None:
         inyecciones = []
@@ -105,7 +105,9 @@ def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inici
                 'Cuota_mensual': 0,
                 'Intereses_mensuales': 0,
                 'Amortizacion_mensual': 0,
-                'Inyeccion_capital': inyeccion_mes
+                'Inyeccion_capital': inyeccion_mes,
+                'Costes_fijos_mensuales': costes_fijos_mensuales,
+                'Pago_total_mensual': costes_fijos_mensuales
             })
             break
         
@@ -120,7 +122,9 @@ def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inici
             'Cuota_mensual': cuota_mensual_fija,
             'Intereses_mensuales': interes,
             'Amortizacion_mensual': amortizacion,
-            'Inyeccion_capital': inyeccion_mes
+            'Inyeccion_capital': inyeccion_mes,
+            'Costes_fijos_mensuales': costes_fijos_mensuales,
+            'Pago_total_mensual': cuota_mensual_fija + costes_fijos_mensuales
         })
         
         capital_pendiente -= amortizacion
@@ -143,7 +147,7 @@ def simulacion_hipoteca_variable_montecarlo(capital_inicial, spread, plazo_inici
     return pd.DataFrame(registros)
 
 def run_monte_carlo_simulation(capital_inicial, spread, plazo_anos, initial_euribor, 
-                              distribution_type, num_simulations, inyecciones=None, **dist_params):
+                              distribution_type, num_simulations, inyecciones=None, costes_fijos_mensuales=0, **dist_params):
     """Run Monte Carlo simulation for variable mortgage"""
     if inyecciones is None:
         inyecciones = []
@@ -158,7 +162,7 @@ def run_monte_carlo_simulation(capital_inicial, spread, plazo_anos, initial_euri
         
         # Run mortgage simulation
         df_sim = simulacion_hipoteca_variable_montecarlo(
-            capital_inicial, spread, plazo_anos * 12, euribor_scenario, inyecciones
+            capital_inicial, spread, plazo_anos * 12, euribor_scenario, inyecciones, costes_fijos_mensuales
         )
         
         df_sim['Simulation'] = i

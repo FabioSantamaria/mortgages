@@ -3,15 +3,16 @@ import pandas as pd
 import numpy as np
 
 # Core calculation functions from your notebook
-def cuota_mensual(capital, tasa, plazo):
-    """Calculate monthly payment"""
+def cuota_mensual(capital, tasa, plazo, costes_fijos_mensuales=0):
+    """Calculate monthly payment including fixed costs"""
     if plazo <= 0:
         raise ValueError("El plazo debe ser mayor a 0 meses")
     if capital <= 0:
-        return 0
+        return costes_fijos_mensuales
     
     tasa_mensual = tasa / 1200
-    return (capital * tasa_mensual) / (1 - (1 + tasa_mensual)**-plazo)
+    cuota_base = (capital * tasa_mensual) / (1 - (1 + tasa_mensual)**-plazo)
+    return cuota_base + costes_fijos_mensuales
 
 def intereses_mensuales(capital_pendiente, tasa):
     """Calculate monthly interest"""
@@ -31,17 +32,22 @@ def calcular_plazo(capital, tasa, cuota):
     return max(math.ceil(plazo), 1)
 
 def maximo_precio_piso_segun_sueldo(sueldo_neto_mensual, relacion_cuota_sueldo, 
-                                    porcentaje_entrada, tasa_interes, plazo):
-    """Calculate maximum house price based on salary"""
+                                    porcentaje_entrada, tasa_interes, plazo, costes_fijos_mensuales=0):
+    """Calculate maximum house price based on salary, considering fixed costs"""
     exponencial = (1. + tasa_interes / (12. * 100.))**(-plazo)
     factor = tasa_interes / (12. * 100.) * 1. / (1. - exponencial)
-    cuota_mensual = sueldo_neto_mensual * relacion_cuota_sueldo
-    capital_pendiente = cuota_mensual / factor
+    cuota_disponible = sueldo_neto_mensual * relacion_cuota_sueldo
+    cuota_para_capital = cuota_disponible - costes_fijos_mensuales
+    
+    if cuota_para_capital <= 0:
+        return 0  # No hay suficiente dinero para el préstamo después de costes fijos
+    
+    capital_pendiente = cuota_para_capital / factor
     precio_piso = capital_pendiente / (1. - porcentaje_entrada / 100.)
     return precio_piso
 
-def simulacion_hipoteca_simple(capital_inicial, tasa, plazo_inicial, cuota_inicial):
-    """Simple mortgage simulation"""
+def simulacion_hipoteca_simple(capital_inicial, tasa, plazo_inicial, cuota_inicial, costes_fijos_mensuales=0):
+    """Simple mortgage simulation including fixed costs"""
     if capital_inicial <= 0:
         raise ValueError("El capital inicial debe ser positivo")
     if plazo_inicial <= 0:
@@ -61,14 +67,20 @@ def simulacion_hipoteca_simple(capital_inicial, tasa, plazo_inicial, cuota_inici
             break
         
         interes = intereses_mensuales(capital_pendiente, tasa)
-        amortizacion = min(cuota_mensual_fija - interes, capital_pendiente)
+        amortizacion = min(cuota_mensual_fija - interes - costes_fijos_mensuales, capital_pendiente)
+        
+        # Ensure amortization is not negative
+        if amortizacion < 0:
+            amortizacion = 0
         
         registros.append({
             'Mes': mes_actual,
             'Capital_pendiente': capital_pendiente,
             'Cuota_mensual': cuota_mensual_fija,
             'Intereses_mensuales': interes,
-            'Amortizacion_mensual': amortizacion
+            'Costes_fijos_mensuales': costes_fijos_mensuales,
+            'Amortizacion_mensual': amortizacion,
+            'Pago_total_mensual': cuota_mensual_fija + costes_fijos_mensuales
         })
         
         capital_pendiente -= amortizacion

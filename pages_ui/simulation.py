@@ -6,26 +6,27 @@ from modules.ui_components import create_mortgage_inputs, display_mortgage_summa
 def show_page():
     st.header("📊 Simulación de hipoteca")
     
-    capital_inicial, tasa_anual, plazo_anos = create_mortgage_inputs()
+    capital_inicial, tasa_anual, plazo_anos, costes_fijos_mensuales = create_mortgage_inputs()
     mostrar_tabla = st.checkbox("Mostrar tabla detallada")
     
     if st.button("Simular hipoteca"):
         try:
-            cuota_mensual_calc = cuota_mensual(capital_inicial, tasa_anual, plazo_anos * 12)
+            cuota_mensual_calc = cuota_mensual(capital_inicial, tasa_anual, plazo_anos * 12, costes_fijos_mensuales)
             
             # Run simulation
             df_simulacion = simulacion_hipoteca_simple(
-                capital_inicial, tasa_anual, plazo_anos * 12, cuota_mensual_calc
+                capital_inicial, tasa_anual, plazo_anos * 12, cuota_mensual_calc, costes_fijos_mensuales
             )
             
             # Calculate totals
             total_intereses = df_simulacion['Intereses_mensuales'].sum()
-            total_pagado = capital_inicial + total_intereses
+            total_costes_fijos = df_simulacion['Costes_fijos_mensuales'].sum()
+            total_pagado = capital_inicial + total_intereses + total_costes_fijos
             
             # Display summary
             display_mortgage_summary(
                 capital_inicial, tasa_anual, plazo_anos, 
-                cuota_mensual_calc, total_intereses, total_pagado
+                cuota_mensual_calc, total_intereses, total_pagado, costes_fijos_mensuales
             )
             
             # Plot results

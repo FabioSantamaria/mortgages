@@ -8,7 +8,7 @@ def show_page():
     st.header("💰 Amortizaciones anticipadas")
 
     # Mortgage inputs
-    capital_inicial, tasa_anual, plazo_anos = create_mortgage_inputs()
+    capital_inicial, tasa_anual, plazo_anos, costes_fijos_mensuales = create_mortgage_inputs()
 
     # Early payment inputs
     inyecciones = create_early_payment_inputs(plazo_anos)
@@ -19,7 +19,7 @@ def show_page():
             st.warning("Agrega al menos una amortización anticipada para comparar.")
         else:
             plazo_meses = plazo_anos * 12
-            cuota_inicial = cuota_mensual(capital_inicial, tasa_anual, plazo_meses)
+            cuota_inicial = cuota_mensual(capital_inicial, tasa_anual, plazo_meses, costes_fijos_mensuales)
             
             try:
                 # Simulación original (sin inyecciones)

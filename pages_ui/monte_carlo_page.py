@@ -15,6 +15,7 @@ def show_page():
         spread = st.number_input("Spread sobre Euribor (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
     with col2:
         plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1)
+        costes_fijos_mensuales = st.number_input("Costes fijos mensuales (€)", min_value=0, value=50, step=10, help="Seguros obligatorios, comisiones, etc.")
 
 
     # Euribor configuration
@@ -70,6 +71,7 @@ def show_page():
                     distribution_type=distribution_type,
                     num_simulations=num_simulations,
                     inyecciones=inyecciones if inyecciones else None,
+                    costes_fijos_mensuales=costes_fijos_mensuales,
                     **dist_params
                 )
                 

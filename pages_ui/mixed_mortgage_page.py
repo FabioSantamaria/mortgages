@@ -19,18 +19,18 @@ def show_page():
         capital_inicial = st.number_input("Capital inicial (€)", min_value=10000, value=200000, step=5000)
         tasa_fija = st.number_input("Tipo fijo inicial (%)", min_value=0.1, max_value=10.0, value=3.5, step=0.1)
     with col2:
-        spread = st.number_input("Diferencial sobre Euribor (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
         plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1)
     
     # Mixed mortgage specific parameters
     st.subheader("Configuración del período mixto")
     col1, col2 = st.columns(2)
     with col1:
+        initial_euribor = st.number_input("Euribor inicial (%)", min_value=-1.0, max_value=10.0, value=2.2, step=0.1)
+        spread = st.number_input("Diferencial sobre Euribor (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
+    with col2:
         anos_fijos = st.slider("Años con tipo fijo", 3, 10, 5, 1)
         st.info(f"📅 **Período fijo**: Meses 1-{anos_fijos * 12} (tipo {tasa_fija}%)")
-    with col2:
-        initial_euribor = st.number_input("Euribor inicial (%)", min_value=-1.0, max_value=10.0, value=2.2, step=0.1)
-        st.info(f"📈 **Período variable**: Mes {anos_fijos * 12 + 1} en adelante (Euribor + {spread}%)")
+        st.info(f"📈 **Período variable**: Mes {anos_fijos * 12 + 1} en adelante (Euribor + {spread:.2f}%)")
 
     # Euribor distribution configuration
     st.subheader("Parámetros de la simulación Euribor")

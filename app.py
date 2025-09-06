@@ -16,22 +16,22 @@ st.markdown("---")
 st.sidebar.title("Navegación")
 opcion = st.sidebar.selectbox(
     "Selecciona una opción:",
-    ["Simulación de hipoteca", 
-    "Amortizaciones anticipadas", 
-    "Monte Carlo - Euribor Estocástico",
-    "Hipoteca Mixta - Monte Carlo", 
+    ["Simulación de hipoteca fija", 
+    "Amortizaciones hipoteca fija", 
+    "Simulación de hipoteca variable",
+    "Simulación de hipoteca mixta", 
     "Costes iniciales", 
     "Máximo precio según sueldo"]
 )
 
 # Route to appropriate page
-if opcion == "Simulación de hipoteca":
+if opcion == "Simulación de hipoteca fija":
     simulation.show_page()
-elif opcion == "Amortizaciones anticipadas":
+elif opcion == "Amortizaciones hipoteca fija":
     early_payments.show_page()
-elif opcion == "Monte Carlo - Euribor Estocástico":
+elif opcion == "Simulación de hipoteca variable":
     monte_carlo_page.show_page()
-elif opcion == "Hipoteca Mixta - Monte Carlo":
+elif opcion == "Simulación de hipoteca mixta":
     mixed_mortgage_page.show_page()
 elif opcion == "Costes iniciales":
     initial_costs.show_page()

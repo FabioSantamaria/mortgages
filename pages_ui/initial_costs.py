@@ -44,8 +44,8 @@ def show_page():
         # Filtrar filas vacías
         costes_df = costes_df[costes_df['Concepto'] != '']
         
-        st.dataframe(costes_df, use_container_width=True, hide_index=True)
+        st.dataframe(costes_df, width='stretch', hide_index=True)
         
         # Gráfico de costes
         fig_costes = plot_cost_breakdown(costes)
-        st.plotly_chart(fig_costes, use_container_width=True)
+        st.plotly_chart(fig_costes, width='stretch')

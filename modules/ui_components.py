@@ -74,7 +74,7 @@ def create_early_payment_inputs(plazo_anos):
         df_inyecciones['Tipo'] = df_inyecciones['tipo_inyeccion']
         
         # Mostrar tabla
-        st.dataframe(df_inyecciones[['Mes', 'Capital (€)', 'Tipo']], use_container_width=True, hide_index=True)
+        st.dataframe(df_inyecciones[['Mes', 'Capital (€)', 'Tipo']], width='stretch', hide_index=True)
         
         # Botón para limpiar inyecciones
         if st.button("🗑️ Limpiar todas las inyecciones"):

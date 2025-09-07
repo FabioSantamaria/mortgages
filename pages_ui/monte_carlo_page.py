@@ -100,11 +100,11 @@ def show_page():
                 # Gráficos
                 st.subheader("📈 Evolución de pagos")
                 fig_payments = plot_monte_carlo_results(stats_df)
-                st.plotly_chart(fig_payments, use_container_width=True)
+                st.plotly_chart(fig_payments, width='stretch')
                 
                 st.subheader("📈 Evolución del Euribor")
                 fig_euribor = plot_euribor_evolution(stats_df)
-                st.plotly_chart(fig_euribor, use_container_width=True)
+                st.plotly_chart(fig_euribor, width='stretch')
                 
                 # Estadísticas detalladas
                 st.subheader("📋 Estadísticas detalladas")
@@ -140,7 +140,7 @@ def show_page():
                     })
                 
                 df_risk = pd.DataFrame(risk_data)
-                st.dataframe(df_risk, use_container_width=True, hide_index=True)
+                st.dataframe(df_risk, width='stretch', hide_index=True)
                 
             except Exception as e:
                 st.error(f"Error en la simulación: {str(e)}")
@@ -154,4 +154,4 @@ def show_page():
             
             # Create and display the plot
             individual_sims_plot = create_individual_simulations_plot(sample_sims)
-            st.plotly_chart(individual_sims_plot, use_container_width=True)
+            st.plotly_chart(individual_sims_plot, width='stretch')

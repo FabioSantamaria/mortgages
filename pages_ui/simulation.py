@@ -30,12 +30,12 @@ def show_page():
             
             # Plot results
             fig = plot_mortgage_simulation(df_simulacion)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # Show table if requested
             if mostrar_tabla:
                 st.subheader("Tabla de amortización")
-                st.dataframe(df_simulacion, use_container_width=True, hide_index=True)
+                st.dataframe(df_simulacion, width='stretch', hide_index=True)
                 
         except Exception as e:
             st.error(f"Error en la simulación: {str(e)}")

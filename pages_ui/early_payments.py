@@ -50,7 +50,7 @@ def show_page():
                 
                 # Gráfico de comparación
                 fig_comparacion = plot_comparacion(df_original, df_con_inyecciones)
-                st.plotly_chart(fig_comparacion, use_container_width=True)
+                st.plotly_chart(fig_comparacion, width='stretch')
                 
                 # Información adicional
                 st.subheader("ℹ️ Información adicional")

@@ -16,8 +16,8 @@ def show_page():
     st.subheader("Parámetros de la hipoteca mixta")
     col1, col2 = st.columns(2)
     with col1:
-        capital_inicial = st.number_input("Capital inicial (€)", min_value=10000, value=200000, step=5000)
-        tasa_fija = st.number_input("Tipo fijo inicial (%)", min_value=0.1, max_value=10.0, value=3.5, step=0.1)
+        capital_inicial = round(st.number_input("Capital inicial (€)", min_value=10000, value=200000, step=5000), 2)
+        tasa_fija = round(st.number_input("Tipo fijo inicial (%)", min_value=0.1, max_value=10.0, value=3.5, step=0.1), 2)
     with col2:
         plazo_anos = st.slider("Plazo del préstamo (años)", 5, 40, 20, 1)
     
@@ -25,8 +25,8 @@ def show_page():
     st.subheader("Configuración del período mixto")
     col1, col2 = st.columns(2)
     with col1:
-        initial_euribor = st.number_input("Euribor inicial (%)", min_value=-1.0, max_value=10.0, value=2.2, step=0.1)
-        spread = st.number_input("Diferencial sobre Euribor (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
+        initial_euribor = round(st.number_input("Euribor inicial (%)", min_value=-1.0, max_value=10.0, value=2.2, step=0.1), 2)
+        spread = round(st.number_input("Diferencial sobre Euribor (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1), 2)
     with col2:
         anos_fijos = st.slider("Años con tipo fijo", 3, 10, 5, 1)
         st.info(f"📅 **Período fijo**: Meses 1-{anos_fijos * 12} (tipo {tasa_fija}%)")

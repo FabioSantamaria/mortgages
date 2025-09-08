@@ -109,6 +109,42 @@ class MortgageComparison:
         
         return self.results
     
+    def _calculate_aggregate_statistics(self, df_all_sims: pd.DataFrame) -> Dict[str, float]:
+        """Calculate aggregate statistics from Monte Carlo simulation results"""
+        if df_all_sims.empty:
+            return {}
+        
+        # Group by simulation to get totals for each simulation
+        simulation_totals = df_all_sims.groupby('Simulation').agg({
+            'Cuota_mensual': 'first',  # First payment of each simulation
+            'Intereses_mensuales': 'sum',  # Total interest paid
+            'Amortizacion_mensual': 'sum'  # Total amortization (should equal capital)
+        })
+        
+        # Calculate total paid for each simulation
+        # Ensure Inyeccion_capital column exists, if not create it with zeros
+        if 'Inyeccion_capital' not in df_all_sims.columns:
+            df_all_sims['Inyeccion_capital'] = 0.0
+            
+        total_pagados = simulation_totals['Cuota_mensual'] * df_all_sims.groupby('Simulation').size() + \
+                       df_all_sims.groupby('Simulation')['Inyeccion_capital'].sum()
+        
+        # Extract values for aggregate calculations
+        total_intereses = simulation_totals['Intereses_mensuales']
+        cuotas_iniciales = simulation_totals['Cuota_mensual']
+        
+        return {
+            'total_pagado_promedio': np.mean(total_pagados),
+            'total_pagado_std': np.std(total_pagados),
+            'total_intereses_promedio': np.mean(total_intereses),
+            'total_intereses_std': np.std(total_intereses),
+            'cuota_inicial_promedio': np.mean(cuotas_iniciales),
+            'cuota_inicial_std': np.std(cuotas_iniciales),
+            'total_pagado_p5': np.percentile(total_pagados, 5),
+            'total_pagado_p50': np.percentile(total_pagados, 50),  # Added median
+            'total_pagado_p95': np.percentile(total_pagados, 95)
+        }
+    
     def _run_fixed_simulation(self, config: Dict) -> Dict[str, Any]:
         """Run fixed rate mortgage simulation"""
         
@@ -177,6 +213,10 @@ class MortgageComparison:
         
         estadisticas = calculate_simulation_statistics(resultados)
         
+        # Calculate aggregate statistics
+        aggregate_stats = self._calculate_aggregate_statistics(df_all_sims)
+        estadisticas.update(aggregate_stats)
+        
         return {
             'type': 'variable',
             'capital_inicial': config['capital'],
@@ -206,6 +246,10 @@ class MortgageComparison:
         )
         
         estadisticas = calculate_mixed_simulation_statistics(resultados)
+        
+        # Calculate aggregate statistics
+        aggregate_stats = self._calculate_aggregate_statistics(resultados)
+        estadisticas.update(aggregate_stats)
         
         return {
             'type': 'mixed',
@@ -354,6 +398,42 @@ class MortgageComparison:
         buffer.seek(0)
         return buffer
     
+    def export_to_excel_detailed(self) -> io.BytesIO:
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            self.get_comparison_summary().to_excel(writer, sheet_name='Resumen', index=False)
+            for name, result in self.results.items():
+                sheet_name = name[:31]
+                if result['type'] == 'fixed':
+                    # Assuming result has 'detalles' as list of dicts for monthly data
+                    if 'detalles' in result:
+                        pd.DataFrame(result['detalles']).to_excel(writer, sheet_name=sheet_name, index=False)
+                    else:
+                        pd.DataFrame({'Nota': ['Detalles mensuales no disponibles para esta simulación']}).to_excel(writer, sheet_name=sheet_name, index=False)
+                else:
+                    # For Monte Carlo, create a sheet with statistics and perhaps average monthly
+                    pd.DataFrame.from_dict(result['estadisticas'], orient='index').to_excel(writer, sheet_name=f'{sheet_name}_Stats')
+                    # If detailed sims available, add another sheet
+                    if 'resultados_simulaciones' in result:
+                        for i, sim_df in enumerate(result['resultados_simulaciones']):
+                            sim_df.to_excel(writer, sheet_name=f'{sheet_name}_Sim{i+1}', index=False)
+        buffer.seek(0)
+        return buffer
+
+    def export_to_csv_detailed(self) -> str:
+        all_dfs = []
+        for name, result in self.results.items():
+            if 'detalles' in result:
+                df = pd.DataFrame(result['detalles'])
+            elif 'resultados_simulaciones' in result:
+                df = pd.concat(result['resultados_simulaciones'], keys=[f'{name}_Sim{i}' for i in range(len(result['resultados_simulaciones']))])
+            else:
+                df = pd.DataFrame()
+            df['Simulación'] = name
+            all_dfs.append(df)
+        combined_df = pd.concat(all_dfs)
+        return combined_df.to_csv(index=False)
+
     def export_to_csv(self, filename: Optional[str] = None) -> str:
         """Export comparison summary to CSV file"""
         

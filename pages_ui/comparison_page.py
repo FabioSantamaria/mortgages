@@ -64,22 +64,22 @@ def mostrar_pagina_comparacion():
 def add_simulation_form():
     """Form to add a new simulation"""
     
-    with st.form("add_simulation_form"):
-        # Simulation name and type
-        col1, col2 = st.columns(2)
-        with col1:
-            sim_name = st.text_input(
-                "Nombre de la Simulación",
-                placeholder="Ej: Fija 3.5%, Variable Euribor+1.2%",
-                help="Nombre descriptivo para identificar esta simulación"
-            )
-        
-        with col2:
-            sim_type = st.selectbox(
-                "Tipo de Hipoteca",
-                ["Fija", "Variable", "Mixta"],
-                help="Selecciona el tipo de hipoteca a simular"
-            )
+    # Pre-select mortgage type to determine form key
+    sim_type = st.selectbox(
+        "Tipo de Hipoteca",
+        ["Fija", "Variable", "Mixta"],
+        help="Selecciona el tipo de hipoteca a simular",
+        key="mortgage_type_selector"
+    )
+    
+    # Use dynamic form key based on mortgage type to force refresh
+    with st.form(f"add_simulation_form_{sim_type.lower()}"):
+        # Simulation name
+        sim_name = st.text_input(
+            "Nombre de la Simulación",
+            placeholder="Ej: Fija 3.5%, Variable Euribor+1.2%",
+            help="Nombre descriptivo para identificar esta simulación"
+        )
         
         # Common parameters
         st.subheader("Parámetros Básicos")
@@ -223,7 +223,7 @@ def add_simulation_form():
         
         inyecciones = []
         if include_injections:
-            inyecciones = create_early_payment_inputs(plazo_anos)
+            inyecciones = create_early_payment_inputs(plazo_anos, "comparison_form")
         
         # Submit button
         submitted = st.form_submit_button("➕ Añadir Simulación", type="primary")
@@ -421,21 +421,42 @@ def display_comparison_results(bank_name: str):
     
     # Summary table
     st.subheader("📊 Resumen Comparativo")
-    summary_df = comparison.get_comparison_summary()
+    summary_data = []
+    for name, res in results.items():
+        if res['type'] == 'fixed':
+            summary_data.append({
+                'Simulación': name,
+                'Tipo': 'Fija',
+                'Cuota Inicial': res['cuota_inicial'],
+                'Total Pagado': res['total_pagado'],
+                'Total Intereses': res['total_intereses'],
+                'Ahorro Intereses': res.get('ahorro_intereses', 0)
+            })
+        else:
+            stats = res['estadisticas']
+            summary_data.append({
+                'Simulación': name,
+                'Tipo': res['type'].title(),
+                'Cuota Inicial': stats['cuota_inicial_promedio'],
+                'Total Pagado': stats['total_pagado_promedio'],
+                'Total Intereses': stats['total_intereses_promedio'],
+                'Ahorro Intereses': stats.get('ahorro_intereses_promedio', 0)
+            })
+    summary_df = pd.DataFrame(summary_data)
     st.dataframe(summary_df, use_container_width=True)
     
     # Export buttons
-    st.subheader("💾 Exportar Resultados")
+    st.subheader("💾 Exportar Resultados Detallados")
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("📊 Descargar Excel", type="secondary", use_container_width=True):
+        if st.button("📊 Descargar Excel Detallado", type="secondary", use_container_width=True):
             try:
-                excel_buffer = comparison.export_to_excel()
+                excel_buffer = comparison.export_to_excel_detailed()
                 st.download_button(
                     label="⬇️ Descargar archivo Excel",
                     data=excel_buffer.getvalue(),
-                    file_name=f"comparacion_hipotecas_{bank_name.replace(' ', '_')}.xlsx",
+                    file_name=f"comparacion_detallada_{bank_name.replace(' ', '_')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
@@ -443,13 +464,13 @@ def display_comparison_results(bank_name: str):
                 st.error(f"❌ Error generando Excel: {str(e)}")
     
     with col2:
-        if st.button("📄 Descargar CSV", type="secondary", use_container_width=True):
+        if st.button("📄 Descargar CSV Detallado", type="secondary", use_container_width=True):
             try:
-                csv_data = summary_df.to_csv(index=False, encoding='utf-8')
+                csv_data = comparison.export_to_csv_detailed()
                 st.download_button(
                     label="⬇️ Descargar archivo CSV",
                     data=csv_data,
-                    file_name=f"comparacion_hipotecas_{bank_name.replace(' ', '_')}.csv",
+                    file_name=f"comparacion_detallada_{bank_name.replace(' ', '_')}.csv",
                     mime="text/csv",
                     use_container_width=True
                 )

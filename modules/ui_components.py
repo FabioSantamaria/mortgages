@@ -27,13 +27,14 @@ def display_mortgage_summary(capital_inicial, tasa_anual, plazo_anos, cuota_mens
     with col4:
         st.metric("Total pagado", f"{total_pagado:,.2f} €")
 
-def create_early_payment_inputs(plazo_anos):
+def create_early_payment_inputs(plazo_anos, form_key="default"):
     """Create early payment input components"""
     st.subheader("Configuración de amortizaciones anticipadas")
     
-    # Inicializar session state para inyecciones
-    if 'inyecciones' not in st.session_state:
-        st.session_state.inyecciones = []
+    # Inicializar session state para inyecciones con clave única
+    inyecciones_key = f'inyecciones_{form_key}'
+    if inyecciones_key not in st.session_state:
+        st.session_state[inyecciones_key] = []
     
     # Formulario para agregar inyecciones
     with st.expander("➕ Agregar nueva amortización anticipada"):
@@ -48,9 +49,9 @@ def create_early_payment_inputs(plazo_anos):
         with col4:
             st.write("")
             st.write("")
-            if st.button("Agregar inyección"):
+            if st.button("Agregar inyección", key=f"add_injection_{form_key}"):
                 # Check if there's already an injection for this month
-                mes_exists = any(inj['mes_inyeccion'] == mes_inyeccion for inj in st.session_state.inyecciones)
+                mes_exists = any(inj['mes_inyeccion'] == mes_inyeccion for inj in st.session_state[inyecciones_key])
                 
                 if mes_exists:
                     st.error(f"Ya existe una inyección para el mes {mes_inyeccion}")
@@ -60,15 +61,16 @@ def create_early_payment_inputs(plazo_anos):
                         'capital_inyectado': capital_inyectado,
                         'tipo_inyeccion': tipo_inyeccion
                     }
-                    st.session_state.inyecciones.append(nueva_inyeccion)
+                    st.session_state[inyecciones_key].append(nueva_inyeccion)
                     st.success("Inyección agregada!")
+                    st.rerun()
     
     # Mostrar inyecciones actuales
-    if st.session_state.inyecciones:
+    if st.session_state[inyecciones_key]:
         st.subheader("Amortizaciones anticipadas configuradas:")
         
         # Crear DataFrame para mostrar las inyecciones
-        df_inyecciones = pd.DataFrame(st.session_state.inyecciones)
+        df_inyecciones = pd.DataFrame(st.session_state[inyecciones_key])
         df_inyecciones['Capital (€)'] = df_inyecciones['capital_inyectado'].apply(lambda x: f"{x:,.0f}")
         df_inyecciones['Mes'] = df_inyecciones['mes_inyeccion']
         df_inyecciones['Tipo'] = df_inyecciones['tipo_inyeccion']
@@ -77,7 +79,7 @@ def create_early_payment_inputs(plazo_anos):
         st.dataframe(df_inyecciones[['Mes', 'Capital (€)', 'Tipo']], width='stretch', hide_index=True)
         
         # Botón para limpiar inyecciones
-        if st.button("🗑️ Limpiar todas las inyecciones"):
-            st.session_state.inyecciones = []
+        if st.button("🗑️ Limpiar todas las inyecciones", key=f"clear_injections_{form_key}"):
+            st.session_state[inyecciones_key] = []
             st.rerun()
-    return st.session_state.inyecciones
+    return st.session_state[inyecciones_key]

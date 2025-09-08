@@ -10,7 +10,7 @@ import io
 from modules.comparison import MortgageComparison
 from modules.ui_components import create_early_payment_inputs
 
-def mostrar_pagina_comparacion():
+def show_page():
     """Display the mortgage comparison page"""
     
     st.title("🏦 Comparación de Hipotecas")
@@ -64,7 +64,8 @@ def mostrar_pagina_comparacion():
 def add_simulation_form():
     """Form to add a new simulation"""
     
-    # Pre-select mortgage type to determine form key
+    # The main form is now a standard container, not a Streamlit form block.
+    # This allows for the dynamic button to function correctly.
     sim_type = st.selectbox(
         "Tipo de Hipoteca",
         ["Fija", "Variable", "Mixta"],
@@ -72,82 +73,143 @@ def add_simulation_form():
         key="mortgage_type_selector"
     )
     
-    # Use dynamic form key based on mortgage type to force refresh
-    with st.form(f"add_simulation_form_{sim_type.lower()}"):
-        # Simulation name
-        sim_name = st.text_input(
-            "Nombre de la Simulación",
-            placeholder="Ej: Fija 3.5%, Variable Euribor+1.2%",
-            help="Nombre descriptivo para identificar esta simulación"
+    st.subheader("Parámetros de Simulación")
+    
+    # Simulation name
+    sim_name = st.text_input(
+        "Nombre de la Simulación",
+        placeholder="Ej: Fija 3.5%, Variable Euribor+1.2%",
+        help="Nombre descriptivo para identificar esta simulación"
+    )
+    
+    # Common parameters
+    st.subheader("Parámetros Básicos")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        capital = st.number_input(
+            "Capital (€)",
+            min_value=10000.0,
+            max_value=2000000.0,
+            value=300000.0,
+            step=5000.0,
+            format="%.0f"
         )
-        
-        # Common parameters
-        st.subheader("Parámetros Básicos")
-        col1, col2, col3 = st.columns(3)
+    
+    with col2:
+        plazo_anos = st.number_input(
+            "Plazo (años)",
+            min_value=5,
+            max_value=40,
+            value=30,
+            step=1
+        )
+    
+    # Type-specific parameters
+    if sim_type == "Fija":
+        with col3:
+            tasa_interes = st.number_input(
+                "Tasa de Interés (%)",
+                min_value=0.1,
+                max_value=15.0,
+                value=3.5,
+                step=0.1,
+                format="%.2f"
+            )
+    
+    elif sim_type == "Variable":
+        st.subheader("Parámetros Variable")
+        col1, col2 = st.columns(2)
         
         with col1:
-            capital = st.number_input(
-                "Capital (€)",
-                min_value=10000.0,
-                max_value=2000000.0,
-                value=300000.0,
-                step=5000.0,
-                format="%.0f"
+            spread = st.number_input(
+                "Spread sobre Euribor (%)",
+                min_value=0.0,
+                max_value=5.0,
+                value=1.2,
+                step=0.1,
+                format="%.2f"
             )
         
         with col2:
-            plazo_anos = st.number_input(
-                "Plazo (años)",
-                min_value=5,
-                max_value=40,
-                value=30,
+            euribor_inicial = st.number_input(
+                "Euribor Inicial (%)",
+                min_value=-1.0,
+                max_value=10.0,
+                value=3.5,
+                step=0.1,
+                format="%.2f"
+            )
+        
+        # Euribor distribution parameters
+        distribucion_tipo = st.selectbox(
+            "Tipo de Distribución del Euribor",
+            ["Gaussiana", "Reversión a la Media", "Caminata Aleatoria Uniforme", "Constante"]
+        )
+        
+        parametros_distribucion = get_distribution_parameters(distribucion_tipo)
+        
+        num_simulaciones = st.number_input(
+            "Número de Simulaciones Monte Carlo",
+            min_value=100,
+            max_value=10000,
+            value=1000,
+            step=100
+        )
+    
+    elif sim_type == "Mixta":
+        st.subheader("Parámetros Mixta")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            tasa_fija = st.number_input(
+                "Tasa Fija (%)",
+                min_value=0.1,
+                max_value=15.0,
+                value=2.8,
+                step=0.1,
+                format="%.2f"
+            )
+        
+        with col2:
+            anos_fijos = st.number_input(
+                "Años con Tasa Fija",
+                min_value=1,
+                max_value=15,
+                value=5,
                 step=1
             )
         
-        # Type-specific parameters
-        if sim_type == "Fija":
-            with col3:
-                tasa_interes = st.number_input(
-                    "Tasa de Interés (%)",
-                    min_value=0.1,
-                    max_value=15.0,
-                    value=3.5,
-                    step=0.1,
-                    format="%.2f"
-                )
-        
-        elif sim_type == "Variable":
-            st.subheader("Parámetros Variable")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                spread = st.number_input(
-                    "Spread sobre Euribor (%)",
-                    min_value=0.0,
-                    max_value=5.0,
-                    value=1.2,
-                    step=0.1,
-                    format="%.2f"
-                )
-            
-            with col2:
-                euribor_inicial = st.number_input(
-                    "Euribor Inicial (%)",
-                    min_value=-1.0,
-                    max_value=10.0,
-                    value=3.5,
-                    step=0.1,
-                    format="%.2f"
-                )
-            
-            # Euribor distribution parameters
-            distribucion_tipo = st.selectbox(
-                "Tipo de Distribución del Euribor",
-                ["Gaussiana", "Reversión a la Media", "Caminata Aleatoria Uniforme", "Constante"]
+        with col3:
+            spread = st.number_input(
+                "Spread Variable (%)",
+                min_value=0.0,
+                max_value=5.0,
+                value=1.2,
+                step=0.1,
+                format="%.2f"
             )
-            
-            parametros_distribucion = get_distribution_parameters(distribucion_tipo)
-            
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            euribor_inicial = st.number_input(
+                "Euribor Inicial (%)",
+                min_value=-1.0,
+                max_value=10.0,
+                value=3.5,
+                step=0.1,
+                format="%.2f"
+            )
+        
+        # Euribor distribution parameters
+        distribucion_tipo = st.selectbox(
+            "Tipo de Distribución del Euribor",
+            ["Gaussiana", "Reversión a la Media", "Caminata Aleatoria Uniforme", "Constante"]
+        )
+        
+        parametros_distribucion = get_distribution_parameters(distribucion_tipo)
+        
+        with col2:
             num_simulaciones = st.number_input(
                 "Número de Simulaciones Monte Carlo",
                 min_value=100,
@@ -155,126 +217,57 @@ def add_simulation_form():
                 value=1000,
                 step=100
             )
-        
-        elif sim_type == "Mixta":
-            st.subheader("Parámetros Mixta")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                tasa_fija = st.number_input(
-                    "Tasa Fija (%)",
-                    min_value=0.1,
-                    max_value=15.0,
-                    value=2.8,
-                    step=0.1,
-                    format="%.2f"
-                )
-            
-            with col2:
-                anos_fijos = st.number_input(
-                    "Años con Tasa Fija",
-                    min_value=1,
-                    max_value=15,
-                    value=5,
-                    step=1
-                )
-            
-            with col3:
-                spread = st.number_input(
-                    "Spread Variable (%)",
-                    min_value=0.0,
-                    max_value=5.0,
-                    value=1.2,
-                    step=0.1,
-                    format="%.2f"
-                )
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                euribor_inicial = st.number_input(
-                    "Euribor Inicial (%)",
-                    min_value=-1.0,
-                    max_value=10.0,
-                    value=3.5,
-                    step=0.1,
-                    format="%.2f"
-                )
-            
-            # Euribor distribution parameters
-            distribucion_tipo = st.selectbox(
-                "Tipo de Distribución del Euribor",
-                ["Gaussiana", "Reversión a la Media", "Caminata Aleatoria Uniforme", "Constante"]
-            )
-            
-            parametros_distribucion = get_distribution_parameters(distribucion_tipo)
-            
-            with col2:
-                num_simulaciones = st.number_input(
-                    "Número de Simulaciones Monte Carlo",
-                    min_value=100,
-                    max_value=10000,
-                    value=1000,
-                    step=100
-                )
-        
-        # Early payments section
-        st.subheader("💰 Inyecciones de Capital (Opcional)")
-        include_injections = st.checkbox("Incluir inyecciones de capital")
-        
-        inyecciones = []
-        if include_injections:
-            inyecciones = create_early_payment_inputs(plazo_anos, "comparison_form")
-        
-        # Submit button
-        submitted = st.form_submit_button("➕ Añadir Simulación", type="primary")
-        
-        if submitted:
-            if not sim_name.strip():
-                st.error("❌ El nombre de la simulación es obligatorio")
-                return
-            
+    
+    inyecciones = create_early_payment_inputs(plazo_anos, "comparison_form")
+    
+    # Submit button is now a regular button, as we are no longer in a form.
+    submitted = st.button("🚀 Simular con amortizaciones anticipadas")
+
+    if submitted:
+        if not sim_name.strip():
+            st.error("❌ El nombre de la simulación es obligatorio")
+        else:
             # Check for duplicate names
             existing_names = [sim['name'] for sim in st.session_state.comparison_simulations]
             if sim_name in existing_names:
                 st.error("❌ Ya existe una simulación con ese nombre")
-                return
-            
-            # Create simulation config
-            sim_config = {
-                'name': sim_name,
-                'type': sim_type.lower(),
-                'capital': capital,
-                'plazo_anos': plazo_anos,
-                'inyecciones': inyecciones
-            }
-            
-            if sim_type == "Fija":
-                sim_config['tasa_interes'] = tasa_interes
-            
-            elif sim_type == "Variable":
-                sim_config.update({
-                    'spread': spread,
-                    'euribor_inicial': euribor_inicial,
-                    'distribucion_tipo': distribucion_tipo,
-                    'parametros_distribucion': parametros_distribucion,
-                    'num_simulaciones': num_simulaciones
-                })
-            
-            elif sim_type == "Mixta":
-                sim_config.update({
-                    'tasa_fija': tasa_fija,
-                    'anos_fijos': anos_fijos,
-                    'spread': spread,
-                    'euribor_inicial': euribor_inicial,
-                    'distribucion_tipo': distribucion_tipo,
-                    'parametros_distribucion': parametros_distribucion,
-                    'num_simulaciones': num_simulaciones
-                })
-            
-            st.session_state.comparison_simulations.append(sim_config)
-            st.session_state.comparison_results = None  # Reset results
-            st.success(f"✅ Simulación '{sim_name}' añadida correctamente")
-            st.rerun()
+            else:
+                # Create simulation config
+                sim_config = {
+                    'name': sim_name,
+                    'type': sim_type.lower(),
+                    'capital': capital,
+                    'plazo_anos': plazo_anos,
+                    'inyecciones': inyecciones
+                }
+                
+                if sim_type == "Fija":
+                    sim_config['tasa_interes'] = tasa_interes
+                
+                elif sim_type == "Variable":
+                    sim_config.update({
+                        'spread': spread,
+                        'euribor_inicial': euribor_inicial,
+                        'distribucion_tipo': distribucion_tipo,
+                        'parametros_distribucion': parametros_distribucion,
+                        'num_simulaciones': num_simulaciones
+                    })
+                
+                elif sim_type == "Mixta":
+                    sim_config.update({
+                        'tasa_fija': tasa_fija,
+                        'anos_fijos': anos_fijos,
+                        'spread': spread,
+                        'euribor_inicial': euribor_inicial,
+                        'distribucion_tipo': distribucion_tipo,
+                        'parametros_distribucion': parametros_distribucion,
+                        'num_simulaciones': num_simulaciones
+                    })
+                
+                st.session_state.comparison_simulations.append(sim_config)
+                st.session_state.comparison_results = None  # Reset results
+                st.success(f"✅ Simulación '{sim_name}' añadida correctamente")
+                st.rerun()
 
 def get_distribution_parameters(distribucion_tipo: str) -> Dict:
     """Get distribution parameters based on type"""
@@ -338,6 +331,9 @@ def display_configured_simulations():
                 
                 if sim['inyecciones']:
                     st.write(f"**Inyecciones:** {len(sim['inyecciones'])} configuradas")
+                    st.write("**Detalles de Inyecciones:**")
+                    for inyeccion in sim['inyecciones']:
+                        st.write(f"- Mes {inyeccion['mes_inyeccion']}: {inyeccion['capital_inyectado']:,.0f} € ({inyeccion['tipo_inyeccion']})")
             
             with col2:
                 if st.button(f"🗑️ Eliminar", key=f"delete_{i}"):
@@ -629,6 +625,3 @@ def display_detailed_results(sim_name: str, result: Dict[str, Any]):
             for inj in result['inyecciones']
         ])
         st.dataframe(injections_df, use_container_width=True)
-
-if __name__ == "__main__":
-    mostrar_pagina_comparacion()

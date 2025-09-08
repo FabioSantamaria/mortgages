@@ -35,7 +35,7 @@ elif opcion == "Simulación de hipoteca variable":
 elif opcion == "Simulación de hipoteca mixta":
     mixed_mortgage_page.show_page()
 elif opcion == "Comparación de Hipotecas":
-    comparison_page.mostrar_pagina_comparacion()
+    comparison_page.show_page()
 elif opcion == "Costes iniciales":
     initial_costs.show_page()
 elif opcion == "Máximo precio según sueldo":

@@ -167,6 +167,7 @@ def run_monte_carlo_simulation(capital_inicial, spread, plazo_anos, initial_euri
     return pd.concat(all_simulations, ignore_index=True)
 
 def calculate_simulation_statistics(df_all_sims):
+
     """Calculate mean and confidence intervals from simulation results"""
     # Group by month and calculate statistics
     stats_df = df_all_sims.groupby('Mes').agg({

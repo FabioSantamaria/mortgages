@@ -58,7 +58,7 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         y=df_hipoteca_original['Amortizacion_mensual'],
         mode='lines',
         line=dict(color='blue', dash='dash'),
-        name='Amortización Mensual (Original)'
+        name='Amortización (Original)'
     ))
 
     fig.add_trace(go.Scatter(
@@ -66,7 +66,7 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         y=df_hipoteca_original['Cuota_mensual'],
         mode='lines',
         line=dict(color='red', dash='dash'),
-        name='Cuota Mensual (Original)'
+        name='Cuota (Original)'
     ))
 
     fig.add_trace(go.Scatter(
@@ -74,7 +74,7 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         y=df_hipoteca_original['Intereses_mensuales'],
         mode='lines',
         line=dict(color='yellow', dash='dash'),
-        name='Intereses Mensuales (Original)'
+        name='Intereses (Original)'
     ))
 
     # Con inyecciones
@@ -83,7 +83,7 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         y=df_hipoteca_con_inyecciones['Amortizacion_mensual'],
         mode='lines',
         line=dict(color='blue'),
-        name='Amortización Mensual (Con Inyecciones)'
+        name='Amortización (Con Inyecciones)'
     ))
 
     fig.add_trace(go.Scatter(
@@ -91,7 +91,7 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         y=df_hipoteca_con_inyecciones['Cuota_mensual'],
         mode='lines',
         line=dict(color='red'),
-        name='Cuota Mensual (Con Inyecciones)'
+        name='Cuota (Con Inyecciones)'
     ))
 
     fig.add_trace(go.Scatter(
@@ -99,7 +99,7 @@ def plot_comparacion(df_hipoteca_original, df_hipoteca_con_inyecciones):
         y=df_hipoteca_con_inyecciones['Intereses_mensuales'],
         mode='lines',
         line=dict(color='yellow'),
-        name='Intereses Mensuales (Con Inyecciones)'
+        name='Intereses (Con Inyecciones)'
     ))
 
     # Marcar inyecciones
@@ -182,7 +182,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         x=stats_df['Mes'],
         y=stats_df['Cuota_mensual_mean'],
         mode='lines',
-        name='Cuota Mensual (Media)',
+        name='Cuota (Media)',
         line=dict(color='blue', width=2)
     ))
     
@@ -193,7 +193,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         mode='lines',
         line=dict(color='rgba(0,100,80,0.2)'),
         #showlegend=False,
-        name='Cuota Mensual (90% CI UP)'
+        name='Cuota (90% UP)'
     ))
     
     # Lower bound for monthly payment
@@ -204,7 +204,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         fill='tonexty',
         fillcolor='rgba(0,100,80,0.2)',
         line=dict(color='rgba(0,100,80,0.2)'),
-        name='Cuota Mensual (90% CI LOW)'
+        name='Cuota (90% LOW)'
     ))
     
     # Monthly interest
@@ -212,7 +212,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         x=stats_df['Mes'],
         y=stats_df['Intereses_mensuales_mean'],
         mode='lines',
-        name='Intereses Mensuales (Media)',
+        name='Intereses (Media)',
         line=dict(color='red', width=2)
     ))
     
@@ -223,7 +223,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         mode='lines',
         line=dict(color='rgba(255,0,0,0.2)'),
         #showlegend=False,
-        name='Intereses Mensuales (90% CI UP)'
+        name='Intereses (90% UP)'
     ))
     
     # Lower bound for interest
@@ -234,7 +234,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         fill='tonexty',
         fillcolor='rgba(255,0,0,0.2)',
         line=dict(color='rgba(255,0,0,0.2)'),
-        name='Intereses Mensuales (90% CI LOW)'
+        name='Intereses (90% LOW)'
     ))
     
     # Monthly amortization
@@ -242,7 +242,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         x=stats_df['Mes'],
         y=stats_df['Amortizacion_mensual_mean'],
         mode='lines',
-        name='Amortización Mensual (Media)',
+        name='Amortización (Media)',
         line=dict(color='green', width=2)
     ))
     
@@ -253,7 +253,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         mode='lines',
         line=dict(color='rgba(0,255,0,0.2)'),
         #showlegend=False,
-        name='Amortización Mensual (90% CI UP)'
+        name='Amortización (90% UP)'
     ))
     
     # Lower bound for amortization
@@ -264,7 +264,7 @@ def plot_monte_carlo_results(stats_df, distribution_type="Gaussian", has_early_p
         fill='tonexty',
         fillcolor='rgba(0,255,0,0.2)',
         line=dict(color='rgba(0,255,0,0.2)'),
-        name='Amortización Mensual (90% CI LOW)'
+        name='Amortización (90% LOW)'
     ))
     
     fig.update_layout(

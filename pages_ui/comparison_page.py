@@ -1,4 +1,5 @@
 import streamlit as st
+from modules.i18n import t
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -54,29 +55,29 @@ def add_simulation_form():
     # The main form is now a standard container, not a Streamlit form block.
     # This allows for the dynamic button to function correctly.
     sim_type = st.selectbox(
-        "Tipo de Hipoteca",
+        t('form.sim.type', "Tipo de Hipoteca"),
         ["Fija", "Variable", "Mixta"],
-        help="Selecciona el tipo de hipoteca a simular",
+        help=t('form.sim.type.help', "Selecciona el tipo de hipoteca a simular"),
         key="mortgage_type_selector"
     )
     
-    st.subheader("Parámetros de Simulación")
+    st.subheader(t('form.parametros.sim.subheader', "Parámetros de Simulación"))
     
     # Simulation name
     sim_name = st.text_input(
-        "Nombre de la Simulación",
-        placeholder="Ej: Fija 3.5%, Variable Euribor+1.2%",
+        t('form.sim.name', "Nombre de la Simulación"),
+        placeholder=t('form.sim.name.placeholder', "Ej: Fija 3.5%, Variable Euribor+1.2%"),
         value=sim_type,
-        help="Nombre descriptivo para identificar esta simulación"
+        help=t('form.sim.name.help', "Nombre descriptivo para identificar esta simulación")
     )
     
     # Common parameters
-    st.subheader("Parámetros Básicos")
+    st.subheader(t('form.basic.params', "Parámetros Básicos"))
     col1, col2, col3 = st.columns(3)
     
     with col1:
         capital = st.number_input(
-            "Capital (€)",
+            t('form.capital', "Capital (€)"),
             min_value=10000.0,
             max_value=2000000.0,
             value=300000.0,
@@ -86,7 +87,7 @@ def add_simulation_form():
     
     with col2:
         plazo_anos = st.number_input(
-            "Plazo (años)",
+            t('form.term_years', "Plazo (años)"),
             min_value=5,
             max_value=40,
             value=30,
@@ -97,7 +98,7 @@ def add_simulation_form():
     if sim_type == "Fija":
         with col3:
             tasa_interes = st.number_input(
-                "Tasa de Interés (%)",
+                t('form.fixed.rate', "Tasa de Interés (%)"),
                 min_value=0.1,
                 max_value=15.0,
                 value=3.5,
@@ -106,12 +107,12 @@ def add_simulation_form():
             )
     
     elif sim_type == "Variable":
-        st.subheader("Parámetros Variable")
+        st.subheader(t('form.variable.params', "Parámetros Variable"))
         col1, col2 = st.columns(2)
         
         with col1:
             spread = st.number_input(
-                "Spread sobre Euribor (%)",
+                t('form.spread', "Spread sobre Euribor (%)"),
                 min_value=0.0,
                 max_value=5.0,
                 value=1.2,
@@ -121,7 +122,7 @@ def add_simulation_form():
         
         with col2:
             euribor_inicial = st.number_input(
-                "Euribor Inicial (%)",
+                t('form.initial.euribor', "Euribor Inicial (%)"),
                 min_value=-1.0,
                 max_value=10.0,
                 value=3.5,
@@ -131,14 +132,14 @@ def add_simulation_form():
         
         # Euribor distribution parameters
         distribucion_tipo = st.selectbox(
-            "Tipo de Distribución del Euribor",
+            t('form.distribution.type', "Tipo de Distribución del Euribor"),
             ["Uniform Random Walk", "Mean Reverting", "Gaussian", "Constant"]
         )
         
         parametros_distribucion = get_distribution_parameters(distribucion_tipo)
         
         num_simulaciones = st.number_input(
-            "Número de Simulaciones Monte Carlo",
+            t('form.num.simulations', "Número de Simulaciones Monte Carlo"),
             min_value=100,
             max_value=10000,
             value=1000,
@@ -146,12 +147,12 @@ def add_simulation_form():
         )
     
     elif sim_type == "Mixta":
-        st.subheader("Parámetros Mixta")
+        st.subheader(t('form.mixed.params', "Parámetros Mixta"))
         col1, col2, col3 = st.columns(3)
         
         with col1:
             tasa_fija = st.number_input(
-                "Tasa Fija (%)",
+                t('form.mixed.fixed.rate', "Tasa Fija (%)"),
                 min_value=0.1,
                 max_value=15.0,
                 value=2.8,
@@ -161,7 +162,7 @@ def add_simulation_form():
         
         with col2:
             anos_fijos = st.number_input(
-                "Años con Tasa Fija",
+                t('form.fixed.years', "Años con Tasa Fija"),
                 min_value=1,
                 max_value=15,
                 value=5,
@@ -170,7 +171,7 @@ def add_simulation_form():
         
         with col3:
             spread = st.number_input(
-                "Spread Variable (%)",
+                t('form.mixed.variable.spread', "Spread Variable (%)"),
                 min_value=0.0,
                 max_value=5.0,
                 value=1.2,
@@ -181,7 +182,7 @@ def add_simulation_form():
         col1, col2 = st.columns(2)
         with col1:
             euribor_inicial = st.number_input(
-                "Euribor Inicial (%)",
+                t('form.initial.euribor', "Euribor Inicial (%)"),
                 min_value=-1.0,
                 max_value=10.0,
                 value=3.5,
@@ -191,7 +192,7 @@ def add_simulation_form():
         
         # Euribor distribution parameters
         distribucion_tipo = st.selectbox(
-            "Tipo de Distribución del Euribor",
+            t('form.distribution.type', "Tipo de Distribución del Euribor"),
             ["Uniform Random Walk", "Mean Reverting", "Gaussian", "Constant"]
         )
         
@@ -199,7 +200,7 @@ def add_simulation_form():
         
         with col2:
             num_simulaciones = st.number_input(
-                "Número de Simulaciones Monte Carlo",
+                t('form.num.simulations', "Número de Simulaciones Monte Carlo"),
                 min_value=100,
                 max_value=10000,
                 value=1000,
@@ -209,16 +210,16 @@ def add_simulation_form():
     inyecciones = create_early_payment_inputs(plazo_anos, "comparison_form")
     
     # Submit button is now a regular button, as we are no longer in a form.
-    submitted = st.button("🚀 Añadir simulación a la cesta")
+    submitted = st.button(t('form.add.sim.submit', "🚀 Añadir simulación a la cesta"))
 
     if submitted:
         if not sim_name.strip():
-            st.error("❌ El nombre de la simulación es obligatorio")
+            st.error(t('form.sim.name.required', "❌ El nombre de la simulación es obligatorio"))
         else:
             # Check for duplicate names
             existing_names = [sim['name'] for sim in st.session_state.comparison_simulations]
             if sim_name in existing_names:
-                st.error("❌ Ya existe una simulación con ese nombre")
+                st.error(t('form.sim.name.duplicate', "❌ Ya existe una simulación con ese nombre"))
             else:
                 # Create simulation config
                 sim_config = {
@@ -289,7 +290,7 @@ def display_configured_simulations():
                         st.write(f"- Mes {inyeccion['mes_inyeccion']}: {inyeccion['capital_inyectado']:,.0f} € ({inyeccion['tipo_inyeccion']})")
             
             with col2:
-                if st.button(f"🗑️ Eliminar", key=f"delete_{i}"):
+                if st.button(t('form.delete', "🗑️ Eliminar"), key=f"delete_{i}"):
                     st.session_state.comparison_simulations.pop(i)
                     st.session_state.comparison_results = None
                     st.rerun()
@@ -297,7 +298,7 @@ def display_configured_simulations():
 def run_all_simulations(bank_name: str):
     """Execute all configured simulations"""
     if not st.session_state.comparison_simulations:
-        st.error("❌ No hay simulaciones configuradas")
+        st.error(t('comparison.bank.name.warning', "❌ No hay simulaciones configuradas"))
         return
     
     # Create progress bar
@@ -312,7 +313,7 @@ def run_all_simulations(bank_name: str):
         for sim_config in st.session_state.comparison_simulations:
             comparison.add_simulation(sim_config)
         
-        status_text.text("🔄 Ejecutando simulaciones...")
+        status_text.text(t('comparison.run.all.button', "🔄 Ejecutando simulaciones..."))
         
         # Run all simulations
         results = comparison.run_all_simulations()
@@ -359,10 +360,10 @@ def display_comparison_results(bank_name: str):
     comparison = st.session_state.comparison_results['comparison_object']
     results = st.session_state.comparison_results['results']
     
-    st.subheader(f"📊 Resultados de Comparación - {bank_name}")
+    st.subheader(f"{t('comparison.results.title', '📊 Resultados de Comparación')} - {bank_name}")
     
     # Summary table
-    st.subheader("📋 Resumen Comparativo")
+    st.subheader(t('comparison.summary.title', "📋 Resumen Comparativo"))
     summary_df = comparison.get_comparison_summary()
     
     if not summary_df.empty:
@@ -372,35 +373,33 @@ def display_comparison_results(bank_name: str):
         col1, col2, col3 = st.columns([1, 1, 2])
         
         with col1:
-            if st.button("📊 Exportar a Excel", use_container_width=True):
+            if st.button(t('comparison.export.excel', "📊 Exportar a Excel")):
                 try:
                     excel_buffer = comparison.export_to_excel()
                     st.download_button(
-                        label="⬇️ Descargar Excel",
+                        label=t('comparison.download.excel', "⬇️ Descargar Excel"),
                         data=excel_buffer.getvalue(),
                         file_name=f"comparacion_hipotecas_{bank_name.replace(' ', '_')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
                 except Exception as e:
                     st.error(f"Error generando Excel: {str(e)}")
         
         with col2:
-            if st.button("📄 Exportar a CSV", use_container_width=True):
+            if st.button(t('comparison.export.csv', "📄 Exportar a CSV")):
                 try:
                     csv_buffer = comparison.export_to_csv()
                     st.download_button(
-                        label="⬇️ Descargar CSV",
+                        label=t('comparison.download.csv', "⬇️ Descargar CSV"),
                         data=csv_buffer.getvalue(),
                         file_name=f"comparacion_hipotecas_{bank_name.replace(' ', '_')}.csv",
-                        mime="text/csv",
-                        use_container_width=True
+                        mime="text/csv"
                     )
                 except Exception as e:
                     st.error(f"Error generando CSV: {str(e)}")
     
     # Detailed comparison charts
-    st.subheader("📈 Gráficos Comparativos")
+    st.subheader(t('comparison.charts.title', "📈 Gráficos Comparativos"))
     
     # Filter successful results
     successful_results = {name: result for name, result in results.items() if 'error' not in result}
@@ -422,7 +421,7 @@ def display_comparison_results(bank_name: str):
             st.plotly_chart(fig_evolution, width='stretch')
     
     # Individual simulation details
-    st.subheader("🔍 Detalles por Simulación")
+    st.subheader(t('comparison.details.title', "🔍 Detalles por Simulación"))
     
     for sim_name, result in successful_results.items():
         with st.expander(f"📊 {sim_name} ({result['type'].title()})", expanded=False):
@@ -600,20 +599,20 @@ def display_individual_simulation_details(result: Dict[str, Any]):
 def show_page():
     """Display the mortgage comparison page"""
     
-    st.title("🏦 Comparación de Hipotecas")
-    st.markdown("Compara diferentes tipos de hipotecas (fija, variable, mixta) para un banco específico")
+    st.title(t('comparison.title', "🏦 Comparación de Hipotecas"))
+    st.markdown(t('comparison.description', "Compara diferentes tipos de hipotecas (fija, variable, mixta) para un banco específico"))
     
     # Bank name input
-    st.subheader("📋 Información del Banco")
+    st.subheader(t('comparison.bank.info.title', "📋 Información del Banco"))
     bank_name = st.text_input(
-        "Nombre del Banco",
+        t('comparison.bank.name.label', "Nombre del Banco"),
         value="",
-        placeholder="Ej: Banco Santander, BBVA, CaixaBank...",
-        help="Introduce el nombre del banco para identificar las simulaciones"
+        placeholder=t('comparison.bank.name.placeholder', "Ej: Banco Santander, BBVA, CaixaBank..."),
+        help=t('comparison.bank.name.help', "Introduce el nombre del banco para identificar las simulaciones")
     )
     
     if not bank_name.strip():
-        st.warning("⚠️ Por favor, introduce el nombre del banco para continuar")
+        st.warning(t('comparison.bank.name.warning', "⚠️ Por favor, introduce el nombre del banco para continuar"))
         return
     
     # Initialize session state for simulations
@@ -624,21 +623,21 @@ def show_page():
         st.session_state.comparison_results = None
     
     # Simulation configuration section
-    st.subheader("⚙️ Configuración de Simulaciones")
+    st.subheader(t('comparison.sim.config.title', "⚙️ Configuración de Simulaciones"))
     
     # Add new simulation
-    with st.expander("➕ Añadir Nueva Simulación", expanded=len(st.session_state.comparison_simulations) == 0):
+    with st.expander(t('comparison.add.new.sim.expander', "➕ Añadir Nueva Simulación"), expanded=len(st.session_state.comparison_simulations) == 0):
         add_simulation_form()
     
     # Display current simulations
     if st.session_state.comparison_simulations:
-        st.subheader("📊 Simulaciones Configuradas")
+        st.subheader(t('comparison.simulations.configured.title', "📊 Simulaciones Configuradas"))
         display_configured_simulations()
         
         # Run simulations button
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("🚀 Ejecutar Todas las Simulaciones", type="primary", use_container_width=True):
+            if st.button(t('comparison.run.all.button', "🚀 Ejecutar Todas las Simulaciones"), type="primary"):
                 run_all_simulations(bank_name)
         
         # Display results if available
@@ -646,4 +645,4 @@ def show_page():
             display_comparison_results(bank_name)
     
     else:
-        st.info("ℹ️ No hay simulaciones configuradas. Añade al menos una simulación para comenzar.")
+        st.info(t('comparison.no.sims.info', "ℹ️ No hay simulaciones configuradas. Añade al menos una simulación para comenzar."))
